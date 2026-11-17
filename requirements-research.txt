@@ -1,0 +1,19 @@
+# Research environment for 06-Ecommerce-Promotion-Lift (docs/research.md). Pinned with ==, the same versions
+# project 05 pins (its requirements.txt), so no new release was introduced here. Direct imports first, transitive
+# pins under the marker. Installed in 06-Ecommerce-Promotion-Lift/.venv with Python 3.11.1 on Windows 10.
+# python-dateutil stays at 2.9.0.post0 with six 1.17.0 (project 05, D37: version 4.x conflicts with Airflow).
+# pyarrow reads the Parquet files that the landing does not list as such (see docs/research.md, Riesgos).
+numpy==2.4.6
+pandas==2.3.3
+pyarrow==26.0.1
+scikit-learn==1.9.1
+# transitive
+cloudpickle==3.1.2
+joblib==1.6.0
+narwhals==2.28.0
+pytz==2026.6
+python-dateutil==2.9.0.post0
+scipy==1.17.1
+six==1.17.0
+threadpoolctl==3.8.0
+tzdata==2026.6
