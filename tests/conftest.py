@@ -140,3 +140,47 @@ def copy_of(tmp_path: Path) -> Callable[[Path], Path]:
         return target
 
     return copy
+
+
+# --- configurations that point at a fixture, the fixture read once --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def cfg_for(cfg, tmp_path: Path):
+    """``cfg_for(folder, malformed=None, **source_changes)``: the default configuration pointed at the Parquet pair of `folder`, with its real
+    sizes and hashes accepted and every generated folder inside this test's ``tmp_path``; a ``Malformed`` brings its own limits and, for
+    ``wrong_hash``, the hashes of the pair it was damaged from."""
+    import dataclasses
+
+    from tests.fixtures.make_fixture import fixture_config
+
+    def build(folder: Path, malformed=None, **source_changes):
+        built = fixture_config(cfg, folder)
+        source = built.source
+        if malformed is not None:
+            if malformed.hash_from is not None:
+                base = fixture_config(cfg, malformed.hash_from).source
+                source = dataclasses.replace(source, train_bytes=base.train_bytes, train_sha256=base.train_sha256)
+            source = dataclasses.replace(source, **malformed.limits)
+        source = dataclasses.replace(source, **source_changes)
+        paths = dataclasses.replace(
+            cfg.paths, raw_dir=tmp_path / "raw", interim_dir=tmp_path / "interim", warehouse=tmp_path / "warehouse" / "promolift.sqlite",
+            models_dir=tmp_path / "models", outputs_dir=tmp_path / "outputs" / "powerbi", site_dir=tmp_path / "outputs" / "site",
+            reports_dir=tmp_path / "reports", seal=tmp_path / "reports" / "model_seal.json", dashboard_html=tmp_path / "dashboard" / "design.html",
+            readme=tmp_path / "README.md", figures_dir=tmp_path / "figures")
+        return dataclasses.replace(built, source=source, paths=paths)
+
+    return build
+
+
+@pytest.fixture(scope="session")
+def canonical(cfg, fixture_truth):
+    """The standard fixture, read strictly once (train and eval) and made canonical: what ``ingest.canonical`` returns."""
+    from promolift.ingest import canonical as make_canonical
+    from promolift.ingest import read_source
+    from tests.fixtures.make_fixture import fixture_config
+
+    accepted = fixture_config(cfg, fixture_truth.dir)
+    train, _ = read_source(accepted.source.train_path, "train", accepted)
+    eval_, _ = read_source(accepted.source.eval_path, "eval", accepted)
+    return make_canonical((train, eval_), accepted)

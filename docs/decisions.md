@@ -26,7 +26,7 @@ Estados: **vigente**, **pendiente del dueño**, **reemplazada por Dxx**.
 - **Motivo**: hay valores de confianza medidos (la investigación los comprobó contra la API); sin descarga en el flujo desaparece la superficie de red, y el riesgo queda en la lectura (D03, D05).
 - **Afecta**: `ingest.py`; `config/pipeline.toml [source]`; V01; runbook R1; README «Cómo correrlo».
 - **Quién**: agente de planificación.
-- **Estado**: vigente; la descarga en el paquete, pendiente del dueño (plan, sección 29, ítem 6).
+- **Estado**: vigente; la descarga en el paquete, pendiente del dueño (plan, sección 29, ítem 6). **Nota del 2026-11-17 (U04)**: el esquema real de los dos archivos tiene **19** columnas (7 de identificadores, `dt`, los 9 campos diarios y las 2 listas; `pq.read_schema` de los dos), no 18 como dice V02 del plan por una suma mal hecha; `schema.SOURCE_SCHEMA` es el real, con las listas como `list<element: double>` y `list<element: int64>`, `stock_hour6_22_cnt`, `holiday_flag` y `activity_flag` como int32.
 
 ## D03 Las filas de descuento anómalo: 0 y mayor que 1 se excluyen y se cuentan; de 0 a 0,5 es la banda más profunda
 
@@ -136,7 +136,7 @@ Estados: **vigente**, **pendiente del dueño**, **reemplazada por Dxx**.
 - **Motivo**: 49 celdas se leen en un tablero y casi todas tienen series suficientes; (b) da celdas de pocas series; la regla de los intervalos que se pisan es conservadora y es la que el sitio ya promete; el grupo indistinguible la vuelve una lectura visual.
 - **Afecta**: `ranking.py`; `[ranking]`; `fact_cell_effect[tier]`; el sitio (filas 10 y 11).
 - **Quién**: agente de planificación.
-- **Estado**: vigente; las bandas y el mínimo, pendiente del dueño (plan, sección 29, ítem 4).
+- **Estado**: vigente; las bandas y el mínimo, pendiente del dueño (plan, sección 29, ítem 4). **Nota del 2026-11-17 (U04, leyendo `train.parquet`)**: la columna `discount` del archivo real guarda el mismo descuento «limpio» de dos maneras, como el double que se quiso y como su vecino de float32 (`0,9` en 15.234 filas y `0,8999999761581421` en 2.127; igual con 0,7 en 58 filas, 0,95 en 1.124 y 0,8 en 29), y la comparación sin tolerancia con un borde manda esas 3.338 filas (0,07 %) a la banda de abajo; los recuentos por banda de `research.md` (78.127, 207.326, 429.102, 847.707, 411.689) las traen así. Cambio mínimo: `days.EDGE_TOLERANCE = 1e-6` (constante del código, no una clave de la configuración): un valor a menos de 1e-6 por debajo de un borde cuenta como el borde, en las bandas y en `regular_min_discount`; muy por debajo del paso de 0,001 de los descuentos que se quisieron y sin cambiar ningún estado del día (0 filas). Con la tolerancia los recuentos por banda de las filas con 0 < descuento ≤ 1 son 15.886, 78.127, 207.268, 429.131, 845.609, 412.692 y 2.495.214; las cifras de celdas de `p04` y `p07` se midieron sin ella y las publicadas (U19) con ella. No hay un redondeo a milésimas: el archivo trae descuentos reales con más decimales (2.600 valores distintos).
 
 ## D14 Partición: entrenamiento, purga de 7 días, V1, V2 y la semana de prueba del conjunto, leída una vez; 90 días alcanzan para este uso
 
