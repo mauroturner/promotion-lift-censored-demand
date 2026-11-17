@@ -18,7 +18,7 @@ minversion = "8.0"
 testpaths = ["tests"]
 # "src" makes the package importable without installing it; "." makes tests.fixtures importable.
 pythonpath = ["src", "."]
-addopts = "-ra --strict-markers --import-mode=importlib -m 'not real_data and not docker'"
+addopts = "-ra --strict-markers --import-mode=importlib --durations=10 -m 'not real_data and not docker'"
 markers = [
     "real_data: needs the real Parquet files in data/raw/ (not selected by default)",
     "docker: needs Docker (not selected by default)",
