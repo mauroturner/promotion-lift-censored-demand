@@ -1,0 +1,26 @@
+series 50,000, days 90, rows 4,500,000
+
+== Discount values at or above 0.999
+   1.000000: 2,181,121
+   0.999000: 3,376
+   1.088000: 18
+   1.059000: 4
+   1.070000: 3
+   1.050000: 2
+   1.019000: 1
+   1.020000: 1
+   exactly 1.0: 2,181,121; in [0.999, 1): 3,376; > 1: 34
+
+== Day states by the regular-day threshold REG (series-days, train split)
+   REG=0.999: promo 37.84%, regular 47.69%, unflagged cut 14.11%, anomalous 0.36%; series with promo and regular days 39,661
+   REG=0.95: promo 37.84%, regular 53.96%, unflagged cut 7.85%, anomalous 0.36%; series with promo and regular days 39,994
+   REG=0.9: promo 37.84%, regular 59.43%, unflagged cut 2.37%, anomalous 0.36%; series with promo and regular days 40,453
+
+== Sales by hour window (train split)
+   share of sales in hours 06-21: 95.19%; hours 0-5 and 22-23: 4.81%
+
+== Stock-out timing in hours 06-21 (series-days)
+   series-days with a stock-out in 06-21: 44.27%; fully in stock 06-21: 55.73%
+   first stock-out hour: p10 6, p25 10, median 15, p75 18, p90 19
+   stock-out days where, once out, the item stays out until 21 h: 86.41%
+   first stock-out hour distribution (06..21, % of days with a stock-out): [14.1, 0.7, 1.7, 3.4, 5.2, 6.5, 6.0, 5.1, 5.1, 6.4, 9.4, 11.4, 9.1, 6.1, 5.0, 4.8]

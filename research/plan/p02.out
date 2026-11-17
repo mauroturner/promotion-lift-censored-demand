@@ -1,0 +1,41 @@
+
+== V1: tail mask on 266,132 fully in-stock days, 2,178,615 hidden hours, hidden sales 117,576.3
+   R0 none (zero)               WAPE 100.00%  bias -100.00%
+   R1 series-hour-state mean    WAPE 116.00%  bias  +8.77%
+   R2 kappa=0                   WAPE 15293582365.22%  bias +15293582222.11%
+   R2 kappa=0.25                WAPE 115.32%  bias  +7.20%
+   R2 kappa=0.5                 WAPE 114.98%  bias  +7.50%
+   R2 kappa=1.0                 WAPE 115.02%  bias  +7.87%
+   R2 kappa=2.0                 WAPE 115.27%  bias  +8.20%
+
+== V2: tail mask on 251,142 fully in-stock days, 2,054,251 hidden hours, hidden sales 119,373.0
+   R0 none (zero)               WAPE 100.00%  bias -100.00%
+   R1 series-hour-state mean    WAPE 112.18%  bias  +0.13%
+   R2 kappa=0                   WAPE 16854981122.67%  bias +16854980979.53%
+   R2 kappa=0.25                WAPE 110.47%  bias  -0.70%
+   R2 kappa=0.5                 WAPE 110.39%  bias  -0.52%
+   R2 kappa=1.0                 WAPE 110.69%  bias  -0.31%
+   R2 kappa=2.0                 WAPE 111.15%  bias  -0.13%
+
+R3 fit on 1,231,510 hidden hours of train-block days in 3.5 s
+   V1 R3 HGB poisson               WAPE 112.81%  bias  +3.44%
+   V2 R3 HGB poisson               WAPE 107.94%  bias  -8.05%
+
+kappa chosen on V1: 0.5
+   V2 WAPE(R2 kappa=0.5) - WAPE(R1 series-hour-state mean): 95% series-bootstrap interval [-1.88; -1.67] points
+   V2 WAPE(R3 HGB poisson) - WAPE(R2 kappa=0.5): 95% series-bootstrap interval [-2.56; -2.36] points
+   V2 WAPE(R3 HGB poisson) - WAPE(R1 series-hour-state mean): 95% series-bootstrap interval [-4.39; -4.11] points
+
+== V2 by cut hour (chosen R2): hidden sales share, WAPE
+   cut  6: days 36,747, WAPE 109.85%
+   cut 10: days 13,040, WAPE 108.36%
+   cut 14: days 12,773, WAPE 107.20%
+   cut 18: days 22,624, WAPE 124.05%
+   cut 21: days 12,059, WAPE 139.88%
+
+== MCAR contrast on V2 (three random hours hidden)
+   R0 none (zero)               WAPE 100.00%  bias -100.00%
+   R1 series-hour-state mean    WAPE 109.69%  bias  +0.89%
+   R2 kappa=0.5                 WAPE 104.67%  bias  +0.73%
+
+elapsed 16.0 s

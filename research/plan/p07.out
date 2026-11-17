@@ -1,0 +1,5 @@
+train band lifts (recovered): ['+145.14%', '+197.77%', '+101.82%', '+66.45%', '+47.21%', '+32.45%', '+17.16%']
+Spearman(depth, lift), train: 0.964
+validation band lifts (recovered): ['+121.21%', '+148.39%', '+54.33%', '+57.89%', '+33.74%', '+32.98%', '+2.20%']
+Spearman(depth, lift), validation: 0.929
+recovered minus raw overall lift, train: +4.20 points, paired two-way 95% [+2.73; +5.76]

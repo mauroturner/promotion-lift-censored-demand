@@ -1,0 +1,36 @@
+recovered mass added on hours 06-21 of the train split: 20.15% of raw sales
+
+== raw: overall flag-day lift on the train block +56.52% [+53.25; +59.76] (two-way), 34,603 series, 965,528 promo series-days
+   unflagged discount days (flag 0, discount < 0.999): lift +43.66% [+40.31; +47.33]
+
+== recovered: overall flag-day lift on the train block +60.72% [+58.36; +63.40] (two-way), 34,603 series, 965,528 promo series-days
+   unflagged discount days (flag 0, discount < 0.999): lift +25.52% [+23.17; +28.31]
+   no regular day in the train block (excluded): 4,254 series
+
+== sensitivity, control = any flag-0 day: recovered overall lift +45.01%
+
+== cells (group x band), recovered, train block: 43 with >= 30 series of 49
+   median interval width: series-only 15.93 points, two-way 31.02 points (ratio 1.80)
+   series-only: 903 pairs, 87 overlap (9.6%)
+   two-way: 903 pairs, 157 overlap (17.4%)
+   recovered minus raw lift by cell: median -0.59 points, min -1369.77, max +53.05
+   by band (all groups), recovered two-way:
+     band 0.00-0.50: +145.14% [+120.61; +171.83]
+     band 0.50-0.60: +197.77% [+171.43; +225.07]
+     band 0.60-0.70: +101.82% [ +96.91; +106.68]
+     band 0.70-0.80:  +66.45% [ +63.02;  +70.21]
+     band 0.80-0.90:  +47.21% [ +45.44;  +49.17]
+     band 0.90-0.95:  +32.45% [ +29.67;  +35.42]
+     band 0.95-1.00:  +17.16% [ +14.66;  +20.48]
+   band pairs overlapping (two-way): 1 of 21
+
+== replication on validation (18 days): 40 cells ranked in both
+   Spearman of cell lifts, train vs. validation: 0.921
+   cells whose validation-minus-train interval contains 0: 42.5%; validation point inside the train interval: 20.0%
+   overall validation lift: +52.16%
+   F0 no lift                   WAPE  48.37%  bias -37.57%
+   F1 last 7 days, same hour    WAPE  35.64%  bias -20.28%
+   F2 with the cell lift        WAPE  43.37%  bias  +3.48%
+   WAPE(F2) - WAPE(F0), two-way 95%: [-6.55; -3.44] points
+
+elapsed 67.2 s

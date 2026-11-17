@@ -1,0 +1,17 @@
+== V1: 48,709 series with a masked day
+   R1         series WAPE  35.38%  bias  +8.77%
+   R2 k=0.25  series WAPE  30.06%  bias  +7.20%
+   R2 k=0.5   series WAPE  30.48%  bias  +7.50%
+   R2 k=1.0   series WAPE  31.63%  bias  +7.87%
+   R2 k=2.0   series WAPE  32.92%  bias  +8.20%
+   R3         series WAPE  31.99%  bias  +3.44%
+== V2: 48,602 series with a masked day
+   R1         series WAPE  38.44%  bias  +0.13%
+   R2 k=0.25  series WAPE  31.16%  bias  -0.70%
+   R2 k=0.5   series WAPE  32.15%  bias  -0.52%
+   R2 k=1.0   series WAPE  33.80%  bias  -0.31%
+   R2 k=2.0   series WAPE  35.46%  bias  -0.13%
+   R3         series WAPE  35.27%  bias  -8.05%
+chosen on V1: R2 k=0.25
+   V2 series WAPE(R2 k=0.25) - WAPE(R1): [-7.52; -7.03] points
+   V2 series WAPE(R2 k=0.25) - WAPE(R3): [-4.30; -3.90] points

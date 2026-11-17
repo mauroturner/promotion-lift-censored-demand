@@ -1,0 +1,6 @@
+overall flag-day lift of the train block (recovered): +60.72%
+   F2a one overall lift   WAPE  45.62%  bias  +0.34%
+   F2 cell lift           WAPE  43.37%  bias  +3.48%
+   WAPE(F2) - WAPE(F2a), two-way 95%: [-2.95; -1.58] points
+IPF: max |b60/b30 - 1| on train days = 3.65e-14
+V2 day-level WAPE: R1 53.00%, R2 50.76%; R2 - R1 95% series bootstrap [-2.34; -2.13] points

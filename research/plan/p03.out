@@ -1,0 +1,16 @@
+
+== V1: 266,132 masked days (42.3% promo), hidden mass 117,576.3
+   method          bias all  bias promo  bias other  lift bias  WAPE day  WAPE series
+   R0 none         -100.00%    -100.00%    -100.00%      +nan%   100.00%      100.00%
+   R1 mean           +8.77%      +8.91%      +8.65%     +0.24%    51.87%       35.38%
+   R2 kappa=0.5      +7.50%      +7.06%      +7.87%     -0.75%    51.45%       30.48%
+   R2 kappa=1.0      +7.87%      +7.61%      +8.09%     -0.44%    50.69%       31.63%
+   R3 HGB            +3.44%      +3.32%      +3.54%     -0.21%    49.20%       31.99%
+
+== V2: 251,142 masked days (38.4% promo), hidden mass 119,373.0
+   method          bias all  bias promo  bias other  lift bias  WAPE day  WAPE series
+   R0 none         -100.00%    -100.00%    -100.00%      +nan%   100.00%      100.00%
+   R1 mean           +0.13%      -4.66%      +3.61%     -7.98%    53.00%       38.44%
+   R2 kappa=0.5      -0.52%      -4.02%      +2.02%     -5.91%    50.96%       32.15%
+   R2 kappa=1.0      -0.31%      -4.25%      +2.55%     -6.63%    50.76%       33.80%
+   R3 HGB            -8.05%     -11.25%      -5.73%     -5.85%    49.72%       35.27%
