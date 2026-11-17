@@ -1,0 +1,45 @@
+# Quick mode for tests and development: the same pipeline on the synthetic fixture instead of the real Parquet files (plan, section 4).
+# Starts from pipeline.toml (same folder) and overrides only what is listed here.
+#
+#   python -m promolift make-fixture data/quick
+#   python -m promolift replay --config config/pipeline.quick.toml
+#
+# Everything the quick run reads and writes is under data/quick/ (git-ignored), resolved against the project folder: it never touches
+# the warehouse, the Parquet files, the HTML design, the reports, the seal, the figures or the README of the full run, and it does not
+# depend on the directory it is started from (D27). The fixture covers the same calendar as the source.
+extends = "pipeline.toml"
+
+[source]
+train_path = "data/quick/train.parquet"
+train_bytes = 0                      # quick mode records the first hash it sees in data/quick/source.lock.json
+train_sha256 = ""
+eval_path = "data/quick/eval.parquet"
+eval_bytes = 0
+eval_sha256 = ""
+
+[split]
+min_masked_days = 50
+
+[recovery]                           # a small R3: the quick run is about where the files go and that the flow runs
+r3_train_days = 2000
+r3_max_iter = 20
+
+[bootstrap]
+resamples = 100
+recovery_resamples = 100
+
+[ranking]
+min_series = 5
+
+[paths]
+raw_dir = "data/quick/raw"
+interim_dir = "data/quick/interim"
+warehouse = "data/quick/promolift.sqlite"
+models_dir = "data/quick/models"
+outputs_dir = "data/quick/outputs/powerbi"
+site_dir = "data/quick/outputs/site"
+reports_dir = "data/quick/reports"
+seal = "data/quick/reports/model_seal.json"
+dashboard_html = "data/quick/dashboard/powerbi-design.html"
+readme = "data/quick/README.md"
+figures_dir = "data/quick/figures"

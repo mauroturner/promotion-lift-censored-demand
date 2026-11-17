@@ -1,0 +1,95 @@
+# Pipeline configuration (plan, section 4). Every default lives here; config/pipeline.quick.toml starts from it.
+# Relative paths are resolved against the project folder, never against the working directory (D27).
+# Keys that can change a sealed value enter the seal's config_sha256 (FINGERPRINT_KEYS in src/promolift/config.py);
+# the others (UNSEALED_KEYS) do not: the rest of [source], [site] and [paths].
+
+[source]                             # D02, D03
+train_path = "data/raw/train.parquet"
+train_bytes = 106436287
+train_sha256 = "6706832db892bbae4969c19d87e07975d2543d2ba7d7d4756360654785de5a3d"
+eval_path = "data/raw/eval.parquet"
+eval_bytes = 8440124
+eval_sha256 = "1b118840664280c6b88bffc84c80ee1f54c05d911e354b7599e5da10995e960e"
+max_bytes = 268435456                # 256 MiB per file
+max_rows = 6000000
+max_hourly_sale = 1000.0             # the real maximum is 16.9 (research.md)
+dataset_commit = "c374e85975c82816c495acfa904cc55ab14a47d3"
+
+[calendar]                           # D05
+first_day = 2024-03-28
+launch_last_day = 2024-06-25
+last_day = 2024-07-02
+day_hours = [6, 21]                  # first and last hour of the analysis, both included
+
+[days]                               # D03, D04
+regular_min_discount = 0.999
+anomalous_max_discount = 0.0         # a discount at or below this is anomalous
+anomalous_min_discount = 1.0         # a discount above this is anomalous
+bands = [0.0, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0]   # edges of the seven bands of D13
+
+[split]                              # D14
+train = [2024-03-28, 2024-05-31]
+purge = [2024-06-01, 2024-06-07]
+valid_v1 = [2024-06-08, 2024-06-16]
+valid_v2 = [2024-06-17, 2024-06-25]
+test = [2024-06-26, 2024-07-02]
+min_masked_days = 10000              # M06
+
+[recovery]                           # D06-D08
+methods = ["r1", "r2", "r3"]
+kappas = [0.25, 0.5, 1.0, 2.0]
+mask_seed_v1 = 0
+mask_seed_v2 = 1
+mask_seed_test = 2
+mcar_hours = 3
+r3_train_days = 150000
+r3_max_iter = 200
+r3_learning_rate = 0.1
+r3_max_leaf_nodes = 31
+r3_min_samples_leaf = 50
+random_state = 0
+leak_tripwire_ratio = 0.5            # M01 (D19)
+
+[effect]                             # D09-D11
+ipf_iterations = 30
+versions = ["raw", "recovered"]
+
+[bootstrap]                          # D12
+resamples = 500
+seed = 0
+recovery_resamples = 500
+
+[ranking]                            # D13
+min_series = 30
+
+[forecast]                           # D15
+naive_days = 7
+
+[variants]                           # D16: reported, never used to choose
+control_any_flag0 = true
+series_only_intervals = true
+mcar_mask = true
+first_category_cells = true
+
+[criteria]                           # preregistered (requirements.md, section 8.1)
+c02_max_abs_bias = 0.10
+c03_max_abs_lift_bias = 0.05
+c05_min_spearman = 0.80
+c06_min_consistent_share = 0.80
+c07_min_spearman = 0.90
+
+[site]
+max_total_bytes = 204800
+
+[paths]
+raw_dir = "data/raw"
+interim_dir = "data/interim"
+warehouse = "data/warehouse/promolift.sqlite"
+models_dir = "data/models"
+outputs_dir = "outputs/powerbi"
+site_dir = "outputs/site"
+reports_dir = "reports"
+seal = "reports/model_seal.json"
+dashboard_html = "dashboard/powerbi-design.html"
+readme = "README.md"
+figures_dir = "docs/figures"
