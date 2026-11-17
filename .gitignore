@@ -1,0 +1,15 @@
+# Generated state of the pipeline; never versioned
+data/raw/
+data/interim/
+data/warehouse/
+data/models/
+data/quick/
+airflow/logs/
+airflow/config/
+airflow/plugins/
+airflow/.env
+reports/validation/history/
+.venv/
+__pycache__/
+.pytest_cache/
+*.egg-info/

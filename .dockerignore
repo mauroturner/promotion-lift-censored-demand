@@ -1,0 +1,3 @@
+# The image only needs requirements.txt; the rest of the project is mounted at run time (airflow/docker-compose.yaml).
+*
+!requirements.txt

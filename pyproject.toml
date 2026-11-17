@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "promolift"
+version = "0.1.0"
+description = "Which promotions really sell: the lift of a promotion over a counterfactual of the same series and hour, with the demand that stock-outs hide recovered, on FreshRetailNet-50K."
+# 3.11 on the developer machine (Windows) and 3.13 in the apache/airflow:3.4.0 image (decision D33).
+requires-python = ">=3.11,<3.14"
+# Runtime and development dependencies are pinned in requirements.txt and requirements-dev.txt (decision D33).
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+# "src" makes the package importable without installing it; "." makes tests.fixtures importable.
+pythonpath = ["src", "."]
+addopts = "-ra --strict-markers --import-mode=importlib -m 'not real_data and not docker'"
+markers = [
+    "real_data: needs the real Parquet files in data/raw/ (not selected by default)",
+    "docker: needs Docker (not selected by default)",
+    "slow: one of the tests the plan names as slow (section 24.1); informative, it is not excluded",
+]

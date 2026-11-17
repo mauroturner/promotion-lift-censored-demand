@@ -1,0 +1,27 @@
+# Runtime dependencies, pinned with == (decision D33): the versions of project 05 (its requirements.txt) and of this project's research environment
+# (requirements-research.txt), with no direct SciPy (nothing here imports it; scikit-learn brings it, decision D32) and no API pins (the site
+# promises no API, plan section 18). python-dateutil stays at 2.9.0.post0 with six 1.17.0: version 4.x conflicts with Airflow's own
+# dependencies (project 01 D44, project 02 D55). No --hash entries on purpose (project 02, D55). cloudpickle stays because joblib requires it.
+# Direct dependencies (the ones src/ and research/ import) first; the transitive ones under the marker line.
+numpy==2.4.6
+pandas==2.3.3
+pyarrow==26.0.1
+scikit-learn==1.9.1
+matplotlib==3.11.2
+# transitive
+cloudpickle==3.1.2
+contourpy==1.3.3
+cycler==0.12.1
+fonttools==4.68.0
+joblib==1.6.0
+kiwisolver==1.5.1
+narwhals==2.28.0
+packaging==26.3
+pillow==13.0.0
+pyparsing==3.3.3
+python-dateutil==2.9.0.post0
+pytz==2026.6
+scipy==1.17.1
+six==1.17.0
+threadpoolctl==3.8.0
+tzdata==2026.6
