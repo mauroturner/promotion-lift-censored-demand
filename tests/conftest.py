@@ -434,3 +434,15 @@ def star_export(evaluated_week, launch_config, tmp_path_factory: pytest.TempPath
     paths = export_star_schema(w.conn, out, MODEL, run, w.view, seal_path=w.seal, interim_dir=w.cfg.paths.interim_dir)
     w.conn.close()
     return SimpleNamespace(out=out, paths=paths, db=w.db, view=w.view, run=run, cfg=w.cfg, seal=w.seal, folder=w.db.parent)
+
+
+@pytest.fixture(scope="session")
+def rendered_html(star_export, tmp_path_factory: pytest.TempPathFactory):
+    """The HTML design rendered once from the exported star model: ``path`` and ``html``."""
+    from types import SimpleNamespace
+
+    from promolift.dashboard.render import render_design
+    from promolift.dashboard.semantic_model import MODEL
+
+    path = render_design(MODEL, star_export.out, tmp_path_factory.mktemp("design") / "powerbi-design.html", star_export.run)
+    return SimpleNamespace(path=path, html=path.read_text(encoding="utf-8"))

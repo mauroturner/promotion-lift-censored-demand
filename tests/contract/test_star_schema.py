@@ -78,7 +78,7 @@ def test_validate_model_names_each_incoherence():
 
     cases = [(dataclasses.replace(MODEL, tables=(*MODEL.tables, MODEL.tables[0])), "repetidas"), (with_table("dim_cell", key=("nope",)), "no es una columna"),
              (with_relationship(0, cardinality="many_to_many"), "uno a varios"), (with_relationship(0, cross_filter="both"), "unidireccional"),
-             (with_relationship(0, active=False), "activa"), (with_relationship(0, fact_column="hour"), "no es una columna del tipo"),
+             (with_relationship(0, active=False), "activa"), (with_relationship(0, fact_column="hour"), "no es una columna del tipo"), (with_relationship(0, fact_column="lift"), "no es una columna del tipo"),
              (with_relationship(0, dim_column="date"), "clave entera"), (with_relationship(0, fact_table="dim_hour"), "no une una dimensión con un hecho")]
     for model, text in cases:
         assert any(text in p for p in validate_model(model)), (text, validate_model(model))

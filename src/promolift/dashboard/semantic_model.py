@@ -9,6 +9,7 @@ every field of a visual is a column or a measure of the model, because no measur
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -246,7 +247,115 @@ RELATIONSHIPS: tuple[Relationship, ...] = tuple(
     Relationship(f"R{number:02d}", dim, key, fact, key) for number, (dim, key, fact) in enumerate(
         ((dim, key, fact) for dim, key, facts in _RELATIONSHIPS for fact in facts), start=1))
 PAGE_COLUMNS, PAGE_ROWS = 12, 9
-MODEL = SemanticModel(TABLES, RELATIONSHIPS)
+
+# --- the measures and the pages (plan, section 20; U13) --------------------------------------------------------------------------------------------------------------
+
+INTEGER, PERCENT, DECIMAL_3, DATETIME_FORMAT, TEXT_FORMAT = "#,0", "0.0%", "0.000", "yyyy-mm-dd hh:mm", "@"
+_CELL = 'fact_cell_effect[ci_kind] = "two_way", fact_cell_effect[seal_state] = "sealed"'
+_LAUNCH_CELLS = 'fact_cell_effect[scope] = "launch", fact_cell_effect[version_key] = "recovered", fact_cell_effect[seal_state] = "sealed"'
+_OVERALL = 'fact_overall_effect[scope] = "launch", fact_overall_effect[seal_state] = "sealed"'
+_RECOVERED_DAY = 'fact_daily_cell[version_key] = "recovered"'
+
+MEASURES: tuple[Measure, ...] = (
+    Measure("Aumento", f"CALCULATE ( SELECTEDVALUE ( fact_cell_effect[lift] ), {_CELL} )", PERCENT,
+            "Aumento de la celda (o del conjunto de celdas que deja la selección) con el intervalo de dos vías y la configuración sellada; el alcance y la versión los dan los segmentadores y las filas del visual."),
+    Measure("Aumento sellado", f'CALCULATE ( SELECTEDVALUE ( fact_cell_effect[lift] ), fact_cell_effect[scope] = "launch", {_CELL} )', PERCENT,
+            "Aumento de la celda en el lanzamiento (los 90 días), con la configuración sellada: lo que la semana de prueba compara."),
+    Measure("Límite inferior", f"CALCULATE ( SELECTEDVALUE ( fact_cell_effect[ci_low] ), {_CELL} )", PERCENT, "Límite inferior del intervalo del 95 % del aumento de la celda."),
+    Measure("Límite superior", f"CALCULATE ( SELECTEDVALUE ( fact_cell_effect[ci_high] ), {_CELL} )", PERCENT, "Límite superior del intervalo del 95 % del aumento de la celda."),
+    Measure("Celdas ordenadas", f'CALCULATE ( COUNTROWS ( fact_cell_effect ), fact_cell_effect[ranked] = TRUE (), {_LAUNCH_CELLS}, fact_cell_effect[ci_kind] = "two_way" )', INTEGER,
+            "Celdas del lanzamiento con series suficientes para entrar en el ranking, en la demanda recuperada."),
+    Measure("Grupos indistinguibles", f"CALCULATE ( DISTINCTCOUNT ( fact_cell_effect[tier] ), fact_cell_effect[ranked] = TRUE (), {_LAUNCH_CELLS} )", INTEGER,
+            "Grupos de celdas que no se distinguen entre sí (sus intervalos se pisan) en el ranking del lanzamiento."),
+    Measure("Aumento total recuperado", f'CALCULATE ( SELECTEDVALUE ( fact_overall_effect[lift] ), fact_overall_effect[version_key] = "recovered", '
+                                        f'fact_overall_effect[estimator] = "counterfactual", fact_overall_effect[control] = "regular", {_OVERALL} )', PERCENT,
+            "Aumento total del lanzamiento con la demanda recuperada, contra el contrafactual de la misma serie y la misma hora. La medida fija la versión: el segmentador de versión no la cambia."),
+    Measure("Aumento total crudo", f'CALCULATE ( SELECTEDVALUE ( fact_overall_effect[lift] ), fact_overall_effect[version_key] = "raw", '
+                                   f'fact_overall_effect[estimator] = "counterfactual", fact_overall_effect[control] = "regular", {_OVERALL} )', PERCENT,
+            "Aumento total del lanzamiento con la venta cruda, contra el contrafactual. La medida fija la versión: el segmentador de versión no la cambia."),
+    Measure("Lo que esconden los quiebres", "[Aumento total recuperado] - [Aumento total crudo]", PERCENT,
+            "Diferencia entre el aumento con la demanda recuperada y el crudo: lo que las horas sin stock escondían del efecto."),
+    Measure("Aumento de la cuenta ingenua", f'CALCULATE ( SELECTEDVALUE ( fact_overall_effect[lift] ), fact_overall_effect[estimator] = "naive_pooled", '
+                                            f'fact_overall_effect[version_key] = "raw", {_OVERALL} )', PERCENT,
+            "La cuenta que sale mal: la venta media de las series-días con promoción sobre la de las regulares, sin serie ni día, con la venta cruda."),
+    Measure("Aumento del día", f"DIVIDE ( CALCULATE ( SUM ( fact_daily_cell[observed] ), {_RECOVERED_DAY} ), CALCULATE ( SUM ( fact_daily_cell[counterfactual] ), {_RECOVERED_DAY} ) ) - 1", PERCENT,
+            "Aumento de los días y las celdas elegidos con la demanda recuperada, desde lo que se emitió cada día de la semana de prueba."),
+    Measure("Tasa de quiebre", "DIVIDE ( SUMX ( fact_hour_profile, fact_hour_profile[stockout_rate] * fact_hour_profile[series_days] ), SUM ( fact_hour_profile[series_days] ) )", PERCENT,
+            "Parte de las series-días sin stock en las horas, los días y los grupos elegidos."),
+    Measure("Venta media por hora", "DIVIDE ( SUMX ( fact_hour_profile, fact_hour_profile[mean_sales] * fact_hour_profile[series_days] ), SUM ( fact_hour_profile[series_days] ) )", DECIMAL_3,
+            "Venta media por serie-día de las horas elegidas (venta normalizada, sin unidades)."),
+    Measure("Demanda recuperada (%)", "DIVIDE ( SUM ( fact_stockout_daily[recovered_mass] ), SUM ( fact_stockout_daily[raw_mass] ) ) - 1", PERCENT,
+            "Cuánto suma la recuperación a la venta cruda de las series-días elegidas (las que ya tienen su recuperación)."),
+    Measure("WAPE del pronóstico", 'CALCULATE ( SELECTEDVALUE ( fact_forecast[wape] ), fact_forecast[scope] = "test", fact_forecast[seal_state] = "sealed" )', PERCENT,
+            "WAPE de un método de pronóstico en la semana de prueba con la configuración sellada (si no, una fila posterior al sello vaciaría la cifra)."),
+    Measure("WAPE de la recuperación", 'CALCULATE ( SELECTEDVALUE ( fact_recovery_check[wape_series] ), fact_recovery_check[mask] = "tail", fact_recovery_check[seal_state] = "sealed" )', PERCENT,
+            "WAPE de la masa oculta por serie de un método de recuperación en el bloque elegido, sobre la máscara de cola, con la configuración sellada."),
+    Measure("Celdas que mantienen su nivel (%)", 'DIVIDE ( CALCULATE ( COUNTROWS ( fact_replication ), fact_replication[consistent] = TRUE (), fact_replication[seal_state] = "sealed" ), '
+                                                  'CALCULATE ( COUNTROWS ( fact_replication ), NOT ISBLANK ( fact_replication[consistent] ), fact_replication[seal_state] = "sealed" ) )', PERCENT,
+            "Parte de las celdas comparables cuyo intervalo de la diferencia prueba − sellado contiene 0: el nivel se repite (C06)."),
+    Measure("Veredicto", 'CALCULATE ( SELECTEDVALUE ( fact_evaluation_summary[verdict_es] ), fact_evaluation_summary[seal_state] = "sealed" )', TEXT_FORMAT,
+            "Veredicto de un criterio con la configuración sellada."),
+    Measure("Series-días con promoción (%)", "DIVIDE ( SUM ( fact_data_quality[promo] ), SUM ( fact_data_quality[series_days] ) )", PERCENT, "Parte de las series-días con promoción en los días elegidos."),
+    Measure("Última fecha de cálculo", 'CALCULATE ( MAX ( dim_pipeline_run[as_of] ), dim_pipeline_run[status] = "ok" )', DATETIME_FORMAT, "Instante de cálculo de la última corrida terminada bien."),
+    Measure("Reglas bloqueantes fallidas", 'CALCULATE ( COUNTROWS ( fact_validation ), fact_validation[severity] = "bloqueante", fact_validation[status] = "falla" )', INTEGER,
+            "Resultados de reglas bloqueantes que fallaron, en las corridas cargadas."),
+)
+
+NOT_FILTERED = " (no lo filtra{plural} {names})"
+_G, _D, _S = "Grupo", "Fecha", "Estado del día"
+PAGES: tuple[Page, ...] = (
+    Page("Qué promociones venden", (
+        Visual("slicer", "Versión", ("dim_version[label_es]",), 0, 0, 6, 1),
+        Visual("slicer", "Grupo", ("dim_cell[group_key]",), 6, 0, 6, 1),
+        Visual("card", "Aumento total recuperado" + NOT_FILTERED.format(plural="", names="el grupo"), ("[Aumento total recuperado]",), 0, 1, 3, 1),
+        Visual("card", "Lo que esconden los quiebres" + NOT_FILTERED.format(plural="", names="el grupo"), ("[Lo que esconden los quiebres]",), 3, 1, 3, 1),
+        Visual("card", "Aumento de la cuenta ingenua" + NOT_FILTERED.format(plural="", names="el grupo"), ("[Aumento de la cuenta ingenua]",), 6, 1, 2, 1),
+        Visual("card", "Celdas ordenadas", ("[Celdas ordenadas]",), 8, 1, 2, 1),
+        Visual("card", "Grupos indistinguibles", ("[Grupos indistinguibles]",), 10, 1, 2, 1),
+        Visual("barChart", "Celdas ordenadas por aumento, con su intervalo y su grupo indistinguible", ("dim_cell[label_es]", "[Aumento]", "[Límite inferior]", "[Límite superior]",
+                                                                                                      "fact_cell_effect[tier]"), 0, 2, 8, 7),
+        Visual("table", "Celdas con pocas series, sin ordenar", ("dim_cell[label_es]", "fact_cell_effect[series]", "fact_cell_effect[ranked]", "[Aumento]"), 8, 2, 4, 7),
+    )),
+    Page("Las horas sin stock y la demanda que esconden", (
+        Visual("slicer", _D, ("dim_date[date]",), 0, 0, 4, 1),
+        Visual("slicer", _G, ("dim_group[label_es]",), 4, 0, 4, 1),
+        Visual("slicer", _S, ("fact_hour_profile[day_state]",), 8, 0, 4, 1),
+        Visual("lineChart", "Tasa de quiebre y venta media por hora", ("dim_hour[hour]", "dim_hour[in_analysis]", "[Tasa de quiebre]", "[Venta media por hora]"), 0, 1, 6, 4),
+        Visual("lineChart", "Un día de ejemplo: venta observada y recuperada por hora" + NOT_FILTERED.format(plural="n", names="la fecha, el grupo ni el estado del día"),
+               ("fact_example_day[hour]", "fact_example_day[observed]", "fact_example_day[recovered]"), 6, 1, 6, 4),
+        Visual("table", "Comprobación de la recuperación en V1, V2 y la prueba" + NOT_FILTERED.format(plural="n", names="la fecha, el grupo ni el estado del día"),
+               ("fact_recovery_check[scope]", "dim_method[label_es]", "[WAPE de la recuperación]", "fact_recovery_check[bias]", "fact_recovery_check[chosen]"), 0, 5, 6, 4),
+        Visual("barChart", "Demanda recuperada (%) por grupo" + NOT_FILTERED.format(plural="n", names="el estado del día"), ("dim_group[label_es]", "[Demanda recuperada (%)]"), 6, 5, 6, 4),
+    )),
+    Page("Por descuento y por grupo", (
+        Visual("barChart", "Aumento por banda de descuento, en las dos versiones", ("dim_band[depth_label_es]", "dim_version[label_es]", "fact_band_effect[lift]"), 0, 0, 6, 4),
+        Visual("barChart", "Descuento sin marca: el aumento de los días con rebaja y sin promoción", ("dim_band[depth_label_es]", "fact_band_effect[lift]", "fact_band_effect[day_state]"), 6, 0, 6, 4),
+        Visual("barChart", "Aumento por grupo de gestión", ("dim_group[label_es]", "fact_group_effect[lift]"), 0, 4, 6, 5),
+        Visual("barChart", "La cuenta ingenua, el contrafactual y el control con cualquier día sin marca",
+               ("fact_overall_effect[estimator]", "fact_overall_effect[control]", "fact_overall_effect[lift]", "dim_version[label_es]"), 6, 4, 6, 5),
+    )),
+    Page("La semana de prueba", (
+        Visual("table", "Criterios C01-C10", ("fact_evaluation_summary[criterion_id]", "fact_evaluation_summary[name_es]", "fact_evaluation_summary[value]", "fact_evaluation_summary[threshold_es]",
+                                              "fact_evaluation_summary[seen_by_research]", "fact_evaluation_summary[seen_by_planner]", "[Veredicto]"), 0, 0, 12, 3),
+        Visual("card", "Celdas que mantienen su nivel (%)", ("[Celdas que mantienen su nivel (%)]",), 0, 3, 4, 1),
+        Visual("scatter", "Aumento sellado contra el de la prueba, por celda (con la diagonal)", ("fact_replication[lift_launch]", "fact_replication[lift_test]", "dim_cell[label_es]"), 0, 4, 6, 5),
+        Visual("barChart", "WAPE de F0, F1, F2a y F2 en la prueba", ("dim_method[label_es]", "[WAPE del pronóstico]"), 6, 3, 6, 3),
+        Visual("table", "Aumento del día por banda en cada día de la prueba", ("dim_date[date]", "dim_cell[band_key]", "[Aumento del día]"), 6, 6, 6, 3),
+    )),
+    Page("Calidad de datos y corridas", (
+        Visual("card", "Series-días con promoción (%)", ("[Series-días con promoción (%)]",), 0, 0, 4, 1),
+        Visual("card", "Reglas bloqueantes fallidas", ("[Reglas bloqueantes fallidas]",), 4, 0, 4, 1),
+        Visual("card", "Última fecha de cálculo", ("[Última fecha de cálculo]",), 8, 0, 4, 1),
+        Visual("barChart", "Series-días de cada día según su estado", ("dim_date[date]", "fact_data_quality[promo]", "fact_data_quality[regular]", "fact_data_quality[unflagged_cut]",
+                                                                      "fact_data_quality[anomalous]"), 0, 1, 8, 4),
+        Visual("table", "Demostración de la fuga: una recuperación que lee el total diario", ("fact_leakage[check_es]", "fact_leakage[value]", "fact_leakage[note_es]"), 8, 1, 4, 4),
+        Visual("table", "Reglas de validación", ("fact_validation[rule_id]", "fact_validation[name_es]", "fact_validation[severity]", "fact_validation[series_days_affected]",
+                                                 "fact_validation[hours_affected]", "fact_validation[status]"), 0, 5, 6, 4),
+        Visual("table", "Corridas", ("dim_pipeline_run[run_key]", "dim_pipeline_run[delivery_id]", "dim_pipeline_run[as_of]", "dim_pipeline_run[status]", "dim_pipeline_run[rows_issued]",
+                                     "dim_pipeline_run[message]"), 6, 5, 6, 4),
+    )),
+)
+MODEL = SemanticModel(TABLES, RELATIONSHIPS, MEASURES, PAGES)
 
 
 def arrow_schema(table: Table) -> pa.Schema:
@@ -255,8 +364,8 @@ def arrow_schema(table: Table) -> pa.Schema:
 
 
 def validate_model(model: SemanticModel) -> list[str]:
-    """What is incoherent in `model` (empty when nothing is): unique table names, known types, keys among the columns, and relationships between a dimension's whole key
-    and a fact's column of the same type, one to many, single direction and active."""
+    """What is incoherent in `model` (empty when nothing is): unique table names, known types, keys among the columns, relationships between a dimension's whole key
+    and a fact's column of the same type, one to many, single direction and active; then the measures (``_measure_problems``) and the pages (``_page_problems``)."""
     problems: list[str] = []
     names = [t.name for t in model.tables]
     if len(set(names)) != len(names):
@@ -281,4 +390,117 @@ def validate_model(model: SemanticModel) -> list[str]:
             problems.append(f"{r.rel_id}: {r.fact_table}[{r.fact_column}] no es una columna del tipo de {r.dim_table}[{r.dim_column}]")
         if (r.cardinality, r.cross_filter, r.active) != ("one_to_many", "single", True):
             problems.append(f"{r.rel_id} no es uno a varios, de filtro unidireccional y activa")
+    return problems + _measure_problems(model) + _page_problems(model)
+
+
+# --- the static checks that stand in for running the measures (item 6 of the risks: no DAX runs anywhere in the project) -----------------------------------------------------------------
+
+_COLUMN_REF = re.compile(r"(?<![\w'])([A-Za-z_]\w*)\[(\w+)\]")
+_MEASURE_REF = re.compile(r"(?<![\w\]'])\[([^\[\]]+)\]")
+_FUNCTION_CALL = re.compile(r"\b([A-Z][A-Z0-9.]*)(?=\s*\()")
+_LITERAL_COMPARISON = re.compile(r'\b([a-z_]\w*)\[(\w+)\]\s*=\s*"([^"]*)"')
+_REMOVES_FILTERS = re.compile(r"\b(ALL|ALLEXCEPT|ALLSELECTED|REMOVEFILTERS|CROSSFILTER|USERELATIONSHIP|KEEPFILTERS)\b")
+DAX_FUNCTIONS = frozenset({"CALCULATE", "COUNTROWS", "DISTINCTCOUNT", "DIVIDE", "MAX", "SELECTEDVALUE", "SUM", "SUMX", "NOT", "ISBLANK", "TRUE"})
+
+
+def dax_column_refs(dax: str) -> set[tuple[str, str]]:
+    """The ``table[column]`` references of a DAX expression."""
+    return set(_COLUMN_REF.findall(dax))
+
+
+def dax_measure_refs(dax: str) -> set[str]:
+    """The ``[Measure]`` references of a DAX expression: a bracket not attached to a table."""
+    return set(_MEASURE_REF.findall(dax))
+
+
+def visual_tables(model: SemanticModel, visual: Visual) -> set[str]:
+    """The tables a visual reads: those of its columns and, through the DAX of its measures and of the measures they name, those the measures name by a column or whole."""
+    found: set[str] = set()
+    pending, seen = list(visual.fields), set()
+    while pending:
+        field = pending.pop()
+        if field.startswith("["):
+            name = field[1:-1]
+            measure = next((m for m in model.measures if m.name_es == name), None)
+            if measure is not None and name not in seen:
+                seen.add(name)
+                found |= {t.name for t in model.tables if re.search(rf"\b{t.name}\b", measure.dax)}
+                pending += [f"[{n}]" for n in dax_measure_refs(measure.dax)]
+        else:
+            found.add(field.split("[")[0])
+    return {t for t in found if any(table.name == t for table in model.tables)}
+
+
+def _field_problem(model: SemanticModel, field: str) -> str | None:
+    """Why the field of a visual does not resolve, or None."""
+    if field.startswith("["):
+        return None if any(f"[{m.name_es}]" == field for m in model.measures) else f"la medida {field} no existe"
+    match = re.fullmatch(r"([A-Za-z_]\w*)\[(\w+)\]", field)
+    if match is None:
+        return f"el campo {field!r} no es una columna ni una medida"
+    table, column = match.groups()
+    return None if any(t.name == table and column in t.column_names for t in model.tables) else f"la columna {field} no existe"
+
+
+def _measure_problems(model: SemanticModel) -> list[str]:
+    problems: list[str] = []
+    names = [m.name_es for m in model.measures]
+    problems += [f"la medida [{n}] está repetida" for n in sorted({n for n in names if names.count(n) > 1})]
+    columns = {t.name: {c.name: c for c in t.columns} for t in model.tables}
+    uses: dict[str, set[str]] = {}
+    for m in model.measures:
+        label = f"[{m.name_es}]"
+        if m.dax.count("(") != m.dax.count(")"):
+            problems.append(f"{label}: paréntesis sin cerrar en el DAX")
+        if m.dax.count('"') % 2:
+            problems.append(f"{label}: comillas sin cerrar en el DAX")
+        problems += [f"{label}: {t}[{c}] no existe" for t, c in sorted(dax_column_refs(m.dax)) if c not in columns.get(t, {})]
+        problems += [f"{label}: {w} no es una tabla" for w in sorted(set(re.findall(r"\b(?:dim|fact)_\w+", m.dax)) - set(columns))]
+        problems += [f"{label}: la función {f} no es de las que usa el plan" for f in sorted(set(_FUNCTION_CALL.findall(m.dax)) - DAX_FUNCTIONS)]
+        uses[m.name_es] = dax_measure_refs(m.dax)
+        problems += [f"{label}: la medida [{r}] no existe o es ella misma" for r in sorted(uses[m.name_es]) if r not in names or r == m.name_es]
+        for table, column, literal in _LITERAL_COMPARISON.findall(m.dax):
+            if column in columns.get(table, {}) and literal not in columns[table][column].description_es:
+                problems.append(f"{label}: compara {table}[{column}] con '{literal}', que la columna no toma")
+        problems += [f"{label}: {w} quita los filtros de los segmentadores" for w in sorted(set(_REMOVES_FILTERS.findall(m.dax)))]
+        if not m.format_string or not m.description_es:
+            problems.append(f"{label}: necesita un formato y una descripción")
+
+    def circle(name: str, path: tuple[str, ...]) -> bool:
+        return name in path or any(circle(n, (*path, name)) for n in uses.get(name, ()) if n in uses and n != name)
+
+    problems += [f"las medidas [{n}] se llaman en círculo" for n in sorted(uses) if any(circle(r, (n,)) for r in uses[n] if r in uses and r != n)]
+    return problems
+
+
+def _page_problems(model: SemanticModel) -> list[str]:
+    problems: list[str] = []
+    titles = [p.name_es for p in model.pages]
+    problems += [f"página repetida: {t}" for t in sorted({t for t in titles if titles.count(t) > 1})]
+    related = {(r.dim_table, r.fact_table) for r in model.relationships}
+    kinds = {t.name: t.kind for t in model.tables}
+    for page in model.pages:
+        if not page.visuals:
+            problems.append(f"{page.name_es}: sin visuales")
+        taken: dict[tuple[int, int], str] = {}
+        for v in page.visuals:
+            label = f"{page.name_es}: {v.title_es}"
+            problems += [f"{label}: {why}" for field in v.fields if (why := _field_problem(model, field)) is not None]
+            if v.kind == "slicer" and (len(v.fields) != 1 or v.fields[0].startswith("[")):
+                problems.append(f"{label}: un segmentador usa una sola columna")
+            tables = visual_tables(model, v)
+            dims, facts = sorted(t for t in tables if kinds[t] == "dimension"), sorted(t for t in tables if kinds[t] == "fact")
+            if len(facts) >= 2 and not dims:
+                problems.append(f"{label}: dos hechos sin una dimensión que los una")
+            if len(dims) >= 2 and not facts:
+                problems.append(f"{label}: dos dimensiones sin un hecho que las una")
+            problems += [f"{label}: {d} y {f} no se unen por ninguna relación" for d in dims for f in facts if (d, f) not in related]
+            if v.w < 1 or v.h < 1 or v.x < 0 or v.y < 0 or v.x + v.w > PAGE_COLUMNS or v.y + v.h > PAGE_ROWS:
+                problems.append(f"{label}: sale de la grilla de {PAGE_COLUMNS} x {PAGE_ROWS}")
+                continue
+            cells = [(cx, cy) for cx in range(v.x, v.x + v.w) for cy in range(v.y, v.y + v.h)]
+            clash = next((taken[c] for c in cells if c in taken), None)
+            if clash is not None:
+                problems.append(f"{label}: se superpone con {clash}")
+            taken.update({c: v.title_es for c in cells})
     return problems
