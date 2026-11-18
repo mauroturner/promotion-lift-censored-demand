@@ -1,5 +1,5 @@
 -- The series-days that had closed at the instant of a calculation, joined to their series and to the block of the split (plan, sections 5 and 7).
--- Rebuilt inside the transaction of a load (DROP + CREATE TABLE AS), so a rollback undoes it too. :as_of_key is the day of the instant as YYYYMMDD
+-- Rebuilt inside the transaction of a load or an export (DROP + CREATE TABLE AS), so a rollback undoes it too; a later instant only extends it (stg_series_days_extend.sql, D46). :as_of_key is the day of the instant as YYYYMMDD
 -- and a day is known whole at 00:00 of the next one (D05): only the days before it are in. The block of a day is the one of
 -- promolift.split.block_of; tests/integration/test_load.py compares the two under two partitions.
 

@@ -6,7 +6,10 @@ Rules of the runner, the same as in projects 01 to 05:
 - ``journal_mode=DELETE`` (WAL does not behave on Docker Desktop mounts), ``synchronous=FULL``, ``foreign_keys=ON``;
 - never ``executescript()``: it commits the open transaction first. SQL files are split into statements with ``sqlite3.complete_statement`` and
   run one by one with named parameters, so a failure can roll the whole load back;
-- the staging table is rebuilt inside the transaction (``DROP TABLE IF EXISTS`` and ``CREATE TABLE AS``), so SQLite rolls it back too.
+- the staging table is rebuilt inside the transaction (``DROP TABLE IF EXISTS`` and ``CREATE TABLE AS``), so SQLite rolls it back too. For a later instant under the
+  same parameters it is extended instead (D46): the days that closed since are added and the recovered sums set since are copied, and ``stg_series_days_meta`` records
+  the instant, the parameters and the rows it was built with; anything else (an earlier instant, another partition, a record that does not describe the table) is a full
+  rebuild, and triggers remove the record when ``series_days`` or ``series`` change in a way the flow does not (``sql/staging/stg_series_days_meta.sql``). The result is the same rows in the same order as a full rebuild (``tests/integration/test_load.py``).
 
 A load is all or nothing: the series-days of the delivery, its row in ``deliveries``, the series it brings, its hour profile, ``stg_series_days``
 rebuilt for its instant and the controls of ``sql/checks/load/`` (and the one against the cube) are one transaction. A delivery that is empty (but
@@ -47,6 +50,9 @@ BUSY_TIMEOUT_MS = 30_000       # an overlapping writer waits this long for the w
 CACHE_KIB = 65_536             # the page cache of a connection (negative ``cache_size`` is in KiB): the 2 MB default is smaller than what a control reads
 CHUNK_ROWS = 100_000           # the rows of one executemany
 STAGING = ("staging/stg_series_days.sql",)
+STAGING_EXTEND = "staging/stg_series_days_extend.sql"
+STAGING_META = "stg_series_days_meta"
+STAGING_META_SQL = "staging/stg_series_days_meta.sql"
 BLOCK_NAMES = ("train", "purge", "valid_v1", "valid_v2", "test")
 SERIES_DAY_COLUMNS = ("series_key", "date_key", "delivery_id", "day_state", "band", "activity_flag", "discount", "holiday_flag", "raw_sum",
                       "instock_hours", "stockout_hours", "instock_sum", "recovered_sum", "fully_out")
@@ -394,9 +400,31 @@ def _profile_rows(days: pd.DataFrame, cube: tuple[np.ndarray, np.ndarray, np.nda
     return rows
 
 
+def _staging_record(conn: sqlite3.Connection) -> tuple[int, str, int] | None:
+    """``(as_of_key, parameters, rows)`` the staging was last built with, or None without a record (a warehouse from before D46, or one rebuilt by hand)."""
+    if not (_table_exists(conn, STAGING_META) and _table_exists(conn, "stg_series_days")):
+        return None
+    rows = conn.execute(f"SELECT as_of_key, params, staged_rows FROM {STAGING_META}").fetchall()
+    return rows[0] if len(rows) == 1 else None
+
+
 def _rebuild(conn: sqlite3.Connection, as_of: datetime, view: Any) -> None:
-    for name in STAGING:
-        run_sql_file(conn, SQL_DIR / name, sql_params(as_of, view))
+    """Bring ``stg_series_days`` to the instant `as_of`: extended from the instant it holds when that is possible (D46), rebuilt whole otherwise."""
+    params = sql_params(as_of, view)
+    key, rest = int(params["as_of_key"]), json.dumps({k: v for k, v in params.items() if k != "as_of_key"}, sort_keys=True)
+    record = _staging_record(conn)
+    extend = (record is not None and record[1] == rest and record[0] <= key
+              and conn.execute("SELECT COUNT(*) FROM stg_series_days").fetchone()[0] == record[2]
+              and conn.execute("SELECT COUNT(*) FROM series_days WHERE date_key < ?", (record[0],)).fetchone()[0] == record[2])
+    if extend:
+        run_sql_file(conn, SQL_DIR / STAGING_EXTEND, {**params, "from_key": record[0]})
+    else:
+        for name in STAGING:
+            run_sql_file(conn, SQL_DIR / name, params)
+    staged = int(conn.execute("SELECT COUNT(*) FROM stg_series_days").fetchone()[0])
+    run_sql_file(conn, SQL_DIR / STAGING_META_SQL)
+    conn.execute(f"DELETE FROM {STAGING_META}")
+    conn.execute(f"INSERT INTO {STAGING_META} VALUES (?, ?, ?)", (key, rest, staged))
 
 
 def stage_series_days(conn: sqlite3.Connection, as_of: datetime, view: Any) -> None:

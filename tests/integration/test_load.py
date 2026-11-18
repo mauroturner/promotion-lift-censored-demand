@@ -459,6 +459,60 @@ def test_the_staging_for_an_instant_holds_the_days_that_had_closed_at_it_whateve
         conn.close()
 
 
+def _staged(conn) -> list[tuple]:
+    return conn.execute("SELECT * FROM stg_series_days ORDER BY rowid").fetchall()
+
+
+def test_a_later_load_and_the_export_extend_the_staging_with_the_new_days_and_leave_what_a_full_rebuild_leaves(after_launch, published, canonical, cfg):
+    """B4 (RNF02, AC34; D46): a daily load adds its days to the staging and the export refreshes the recovered sums, instead of rebuilding the 4.5 million real rows twice
+    per delivery; the staging is then row for row, in the same order, what a full rebuild for the instant gives."""
+    conn = connect(after_launch)
+    try:
+        statements: list[str] = []
+        conn.set_trace_callback(statements.append)
+        spec = published.plan[1]
+        load(conn, published, canonical, cfg, spec.delivery_id)
+        keys = np.array([20240626])
+        conn.execute("BEGIN IMMEDIATE")
+        warehouse.set_recovered_sums(conn, keys, np.arange(300, dtype=np.float64)[:, None] + 0.5)
+        warehouse.stage_series_days(conn, spec.as_of, cfg)          # the export's staging, after recover set the day's sums
+        conn.execute("COMMIT")
+        conn.set_trace_callback(None)
+        assert not [s for s in statements if "DROP TABLE IF EXISTS stg_series_days" in s], "the staging of the days that had closed is rebuilt"
+        extended = _staged(conn)
+        assert len(extended) == 27300 and conn.execute("SELECT COUNT(*) FROM stg_series_days WHERE recovered_sum IS NULL AND date_key = 20240626").fetchone()[0] == 0
+        conn.execute("DROP TABLE stg_series_days_meta")              # without its record the staging is rebuilt whole
+        rebuild_staging(conn, spec.as_of, cfg)
+        assert _staged(conn) == extended
+    finally:
+        conn.close()
+
+
+def test_the_staging_is_rebuilt_whole_when_the_instant_goes_back_the_partition_changes_or_a_day_appears_before_the_instant(after_launch, published, canonical, cfg):
+    """The previous behavior where an extension would be wrong: every one of these is a full rebuild, and the result is that of a fresh warehouse."""
+    conn = connect(after_launch)
+    try:
+        for spec in published.plan[1:3]:
+            load(conn, published, canonical, cfg, spec.delivery_id)
+        rebuild_staging(conn, datetime(2024, 6, 27), cfg)              # back one day
+        assert conn.execute("SELECT COUNT(*), MAX(date_key) FROM stg_series_days").fetchone() == (27300, 20240626)
+        moved = dataclasses.replace(cfg, split=dataclasses.replace(cfg.split, valid_v2=(date(2024, 6, 18), date(2024, 6, 25))))
+        rebuild_staging(conn, datetime(2024, 6, 28), moved)            # forward, under another partition
+        assert conn.execute("SELECT block FROM stg_series_days WHERE date_key = 20240617 LIMIT 1").fetchone() == ("outside",)
+        conn.execute("UPDATE stg_series_days_meta SET staged_rows = staged_rows - 1")   # the record no longer describes the table
+        rebuild_staging(conn, datetime(2024, 6, 28), moved)
+        assert conn.execute("SELECT COUNT(*) FROM stg_series_days").fetchone()[0] == 27600
+        for change in ("UPDATE series_days SET recovered_sum = NULL WHERE date_key = 20240401", "UPDATE series_days SET raw_sum = raw_sum WHERE series_key = 3",
+                       "UPDATE series SET city_id = city_id WHERE series_key = 3", "DELETE FROM hour_profile WHERE 0"):
+            conn.execute(change)                                       # a change the flow never makes removes the record; one it makes (none here) keeps it
+            assert conn.execute("SELECT COUNT(*) FROM stg_series_days_meta").fetchone()[0] == (1 if change.startswith("DELETE FROM hour_profile") else 0), change
+            rebuild_staging(conn, datetime(2024, 6, 28), moved)
+        conn.execute("UPDATE series_days SET recovered_sum = 1.0 WHERE date_key = 20240401 AND recovered_sum IS NULL")
+        assert conn.execute("SELECT COUNT(*) FROM stg_series_days_meta").fetchone()[0] == 1, "filling a recovered sum keeps the record"
+    finally:
+        conn.close()
+
+
 def test_a_failed_staging_rebuild_leaves_the_warehouse_as_it_was(after_launch, cfg):
     conn = connect(after_launch)
     try:
