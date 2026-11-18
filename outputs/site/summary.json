@@ -156,6 +156,7 @@
     "value": 0.529
    }
   },
+  "overlap_groups": 3,
   "pairs": 903,
   "pairs_overlapping": 183,
   "period_end": "2024-07-02",
@@ -173,7 +174,7 @@
   "stores": 898,
   "tiers": 5
  },
- "run_key": "20261118T083929959268Z",
+ "run_key": "20261118T104140428720Z",
  "schema_version": 1,
  "seal": {
   "config_sha256": "b33a74fec32d1984d5b5b276c28f20f425fa69150cf25a3196b6c25cf7fb5bf4",

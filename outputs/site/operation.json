@@ -297,6 +297,72 @@
    "wape": 0.403
   }
  ],
+ "overlap_groups_now": [
+  {
+   "cells": [
+    "g0-b0"
+   ],
+   "lift_max": 21.613,
+   "lift_min": 21.613,
+   "overlap_group": 1
+  },
+  {
+   "cells": [
+    "g0-b1",
+    "g0-b2",
+    "g0-b3",
+    "g0-b4",
+    "g0-b5",
+    "g0-b6",
+    "g1-b1",
+    "g1-b2",
+    "g1-b3",
+    "g1-b4",
+    "g1-b5",
+    "g2-b2",
+    "g2-b3",
+    "g2-b4",
+    "g2-b5",
+    "g3-b1",
+    "g3-b2",
+    "g3-b3",
+    "g3-b4",
+    "g3-b5",
+    "g4-b2",
+    "g4-b3",
+    "g4-b4",
+    "g5-b0",
+    "g5-b1",
+    "g5-b2",
+    "g5-b3",
+    "g5-b4",
+    "g5-b5",
+    "g6-b0",
+    "g6-b1",
+    "g6-b2",
+    "g6-b3"
+   ],
+   "lift_max": 7.013,
+   "lift_min": 0.339,
+   "overlap_group": 2
+  },
+  {
+   "cells": [
+    "g1-b6",
+    "g2-b6",
+    "g3-b6",
+    "g4-b5",
+    "g4-b6",
+    "g5-b6",
+    "g6-b4",
+    "g6-b5",
+    "g6-b6"
+   ],
+   "lift_max": 0.285,
+   "lift_min": 0.046,
+   "overlap_group": 3
+  }
+ ],
  "replication": [
   {
    "cell": "g0-b0",
@@ -581,7 +647,7 @@
    "test": 0.055
   }
  ],
- "run_key": "20261118T083929959268Z",
+ "run_key": "20261118T104140428720Z",
  "schema_version": 1,
  "tiers_now": [
   {

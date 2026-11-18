@@ -1,6 +1,6 @@
 # Reporte de validación
 
-- Corrida: `20261118T083929959268Z`
+- Corrida: `20261118T104140428720Z`
 - Resultado: **Aceptado: ninguna regla bloqueante falla.**
 - SHA-256 de `train.parquet`: `6706832db892bbae4969c19d87e07975d2543d2ba7d7d4756360654785de5a3d`
 - SHA-256 de `eval.parquet`: `1b118840664280c6b88bffc84c80ee1f54c05d911e354b7599e5da10995e960e`
