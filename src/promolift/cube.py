@@ -1,4 +1,9 @@
-"""The canonical hours, one pair of tensors per day, and the manifest that names every canonical file (RF03, D22; plan, sections 3 and 5).
+"""The hours of the pipeline, in two cubes and the delivery files (RF03, RF08, D22; plan, sections 3 and 5).
+
+**The canonical cube** (``data/interim/canonical/``, written by ``fetch_source``) has one pair of tensors per day for all 97 days of the two files and a
+manifest that names every canonical file. **The cube of the loaded deliveries** (``data/interim/cube/``, written when a delivery is loaded) holds the hours
+of each delivery once its series-days are in the warehouse, with a manifest of its own written last: a day is visible through it only after its delivery
+arrived, so a calculation for an instant cannot read a day that was not delivered yet (RNF06 b).
 
 ``data/interim/canonical/<date_key>.sales.npy`` holds the sale of the 24 hours of one day for every series (float32, series x 24, in the order of
 ``series_key``) and ``<date_key>.stock.npy`` the hourly status (int8, 1 = out of stock). They are read with ``np.load(..., mmap_mode="r",
@@ -8,6 +13,7 @@ last: a set of files without its manifest, or a file that is not the one the man
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import re
@@ -24,6 +30,9 @@ from promolift.files import atomic_path, sha256_file, write_atomic
 INTERIM_MANIFEST = "interim_manifest.json"
 INTERIM_MANIFEST_VERSION = 1
 CANONICAL_DIR = "canonical"
+LOADED_CUBE_DIR = "cube"
+CUBE_MANIFEST = "manifest.json"
+CUBE_MANIFEST_VERSION = 1
 TABLES = ("series.parquet", "series_days.parquet")
 FIELDS = ("sales", "stock")
 DTYPES = {"sales": np.dtype(np.float32), "stock": np.dtype(np.int8)}
@@ -175,3 +184,109 @@ def read_delivery_cube(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     if sales.shape != stock.shape:
         raise InterimError(f"{Path(path).name}: sales y stock no tienen la misma forma")
     return date_keys, sales, stock
+
+
+# --- the cube of the loaded deliveries ---------------------------------------------------------------------------------------------
+
+
+def _npy_bytes(array: np.ndarray, dtype: np.dtype) -> bytes:
+    buffer = io.BytesIO()
+    np.save(buffer, np.ascontiguousarray(array, dtype=dtype), allow_pickle=False)
+    return buffer.getvalue()
+
+
+def _read_cube_manifest(folder: Path) -> list[dict[str, Any]]:
+    """The entries of the manifest of the cube of the loaded deliveries (none if there is no manifest); ``InterimError`` if it is not a valid one."""
+    path = Path(folder) / CUBE_MANIFEST
+    if not path.is_file():
+        return []
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        entries = document["deliveries"]
+        valid = (isinstance(document, dict) and set(document) == {"version", "deliveries"} and document["version"] == CUBE_MANIFEST_VERSION
+                 and isinstance(entries, list)
+                 and all(isinstance(e, dict) and set(e) == {"delivery_id", "n_series", "date_keys", "files"} and isinstance(e["delivery_id"], str)
+                         and isinstance(e["n_series"], int) and isinstance(e["date_keys"], list) and all(isinstance(k, int) for k in e["date_keys"])
+                         and isinstance(e["files"], dict) and set(e["files"]) == set(FIELDS)
+                         and all(isinstance(f, dict) and set(f) == {"name", "sha256"} and isinstance(f["name"], str) and _HEX64.fullmatch(str(f["sha256"]))
+                                 for f in e["files"].values()) for e in entries))
+    except (OSError, ValueError, KeyError, TypeError):
+        valid = False
+    if not valid:
+        raise InterimError(f"{CUBE_MANIFEST} no es un manifiesto válido del cubo de las entregas cargadas (runbook R12)")
+    return entries
+
+
+def store_delivery_cube(interim_dir: Path, delivery_id: str, date_keys: np.ndarray, sales: np.ndarray, stock: np.ndarray) -> None:
+    """Copy the hours of a loaded delivery into ``<interim_dir>/cube/`` (``<delivery_id>.sales.npy`` and ``.stock.npy``) and list it in the manifest,
+    written last and atomically: a failure before it leaves the delivery unlisted, so none of its days is visible, and storing again finishes the job.
+
+    Storing the same hours again changes nothing (a file that was lost or damaged is written again); other hours for a delivery that is already in the
+    cube are refused, and so is a day that another delivery already holds (runbook R12). The close has no day and is listed all the same."""
+    folder = Path(interim_dir) / LOADED_CUBE_DIR
+    entries = _read_cube_manifest(folder)
+    keys = [int(k) for k in np.asarray(date_keys).tolist()]
+    payloads = {"sales": _npy_bytes(sales, DTYPES["sales"]), "stock": _npy_bytes(stock, DTYPES["stock"])}
+    digests = {field: hashlib.sha256(payloads[field]).hexdigest() for field in FIELDS}
+    existing = next((e for e in entries if e["delivery_id"] == delivery_id), None)
+    if existing is not None and (existing["date_keys"] != keys or {f: v["sha256"] for f, v in existing["files"].items()} != digests):
+        raise InterimError(f"la entrega {delivery_id} ya está en el cubo con otro contenido (runbook R12): sus días ya se leyeron")
+    for other in entries:
+        clash = sorted(set(keys) & set(other["date_keys"]))
+        if clash and other["delivery_id"] != delivery_id:
+            raise InterimError(f"el día {clash[0]} ya está en la entrega {other['delivery_id']} del cubo (runbook R12)")
+    for field in FIELDS:
+        path = folder / f"{delivery_id}.{field}.npy"
+        if not path.is_file() or sha256_file(path) != digests[field]:
+            write_atomic(path, payloads[field])
+    if existing is None:
+        entry = {"delivery_id": delivery_id, "n_series": int(np.asarray(sales).shape[0]), "date_keys": keys,
+                 "files": {field: {"name": f"{delivery_id}.{field}.npy", "sha256": digests[field]} for field in FIELDS}}
+        write_atomic(folder / CUBE_MANIFEST, json.dumps({"version": CUBE_MANIFEST_VERSION, "deliveries": [*entries, entry]}, indent=2) + "\n")
+
+
+class LoadedCube:
+    """The hours of the days whose delivery was loaded: ``sales(date_key)`` and ``stock(date_key)``, each series x 24, read lazily as memory maps."""
+
+    def __init__(self, folder: Path, entries: list[dict[str, Any]]) -> None:
+        self.folder = Path(folder)
+        self._where: dict[int, tuple[dict[str, Any], int]] = {key: (entry, i) for entry in entries for i, key in enumerate(entry["date_keys"])}
+        self.date_keys = np.array(sorted(self._where), dtype=np.int32)
+        self.n_series = int(entries[0]["n_series"]) if entries else 0
+        self.deliveries = [e["delivery_id"] for e in entries]
+
+    def __contains__(self, date_key: object) -> bool:
+        return date_key in self._where
+
+    def _load(self, date_key: int, field: str) -> np.ndarray:
+        if date_key not in self._where:
+            raise KeyError(f"el cubo de las entregas cargadas no tiene el día {date_key}")
+        entry, index = self._where[date_key]
+        array = np.load(self.folder / entry["files"][field]["name"], mmap_mode="r", allow_pickle=False)
+        if array.dtype != DTYPES[field] or array.ndim != 3 or array.shape[0] != self.n_series or array.shape[2] != 24 or array.shape[1] != len(entry["date_keys"]):
+            raise InterimError(f"{entry['files'][field]['name']} no tiene la forma ni el tipo que dice el manifiesto del cubo (runbook R12)")
+        return array[:, index, :]
+
+    def sales(self, date_key: int) -> np.ndarray:
+        """float32 (series, 24): the sale of every hour of a delivered day, read-only."""
+        return self._load(date_key, "sales")
+
+    def stock(self, date_key: int) -> np.ndarray:
+        """int8 (series, 24): 1 where the hour had no stock, read-only."""
+        return self._load(date_key, "stock")
+
+
+def open_loaded_cube(interim_dir: Path) -> LoadedCube:
+    """The cube of the loaded deliveries of `interim_dir`; ``InterimError`` if it has no manifest or a file is missing or is not the one the manifest names."""
+    folder = Path(interim_dir) / LOADED_CUBE_DIR
+    if not (folder / CUBE_MANIFEST).is_file():
+        raise InterimError(f"falta {CUBE_MANIFEST} en {folder}: el cubo de las entregas cargadas no tiene su manifiesto (runbook R12)")
+    entries = _read_cube_manifest(folder)
+    for entry in entries:
+        for field in FIELDS:
+            name, expected = entry["files"][field]["name"], entry["files"][field]["sha256"]
+            if not (folder / name).is_file():
+                raise InterimError(f"falta {name}, que el manifiesto nombra (runbook R12)")
+            if sha256_file(folder / name) != expected:
+                raise InterimError(f"{name} no coincide con la huella que dice el manifiesto: es de otra escritura (runbook R12)")
+    return LoadedCube(folder, entries)

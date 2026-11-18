@@ -30,6 +30,7 @@ from typing import Any, Literal
 import numpy as np
 import pandas as pd
 
+from promolift.cube import store_delivery_cube
 from promolift.days import EDGE_TOLERANCE, STATE_NAMES
 from promolift.deliveries import DAYS_COLUMNS, DeliverySpec, delivery_sums
 from promolift.schema import SERIES_COLUMNS, date_key
@@ -90,6 +91,15 @@ class CheckFailedError(RuntimeError):
         failing = [c for c in checks if c.violations]
         detail = "; ".join(f"{c.check_id}: {c.violations} filas, por ejemplo {c.sample[:2]}" for c in failing)
         super().__init__(f"{step} se deshizo; controles con filas que los violan: {detail}")
+
+
+class CubeStoreError(RuntimeError):
+    """The delivery was loaded into SQLite but its hours could not be copied to the cube of the loaded deliveries (runbook R12): storing them again
+    (``cube.store_delivery_cube``) finishes the job, and until then none of the delivery's days is visible through the cube."""
+
+    def __init__(self, delivery_id: str, error: BaseException) -> None:
+        super().__init__(f"La entrega {delivery_id} quedó cargada en el almacén pero su cubo no se copió ({type(error).__name__}: {error}); "
+                         "volver a copiarlo termina la carga (docs/runbook.md, R12)")
 
 
 class SchemaDriftError(RuntimeError):
@@ -376,13 +386,16 @@ def _rebuild(conn: sqlite3.Connection, as_of: datetime, view: Any) -> None:
 
 
 def load_delivery(conn: sqlite3.Connection, days: pd.DataFrame, cube: tuple[np.ndarray, np.ndarray, np.ndarray], spec: DeliverySpec, run_key: str,
-                  view: Any, *, sha256: str, series: pd.DataFrame) -> LoadResult:
+                  view: Any, *, sha256: str, series: pd.DataFrame, interim_dir: Path | None = None) -> LoadResult:
     """Add a validated delivery to the warehouse and rebuild ``stg_series_days`` for its instant, in one transaction (RF08).
 
     `days` and `cube` are the delivery as ``deliveries.read_delivery`` returns it; `series` is the canonical series table (the series the warehouse does not
     have yet are added, and one it has must be unchanged); `sha256` is the delivery's fingerprint in the manifest, recorded in ``deliveries``. A delivery
     with no series-days is refused, except the close, which loads empty and must be empty; one already loaded is refused too. If anything fails, a series-day
     that repeats or a control included, the transaction is rolled back and the warehouse keeps exactly what it had.
+
+    With `interim_dir`, the hours of the delivery are copied to ``<interim_dir>/cube/`` (``cube.store_delivery_cube``) after the commit and never before it,
+    so a rejected load leaves the cube byte for byte as it was; if that copy fails, ``CubeStoreError`` says the delivery is loaded without its cube.
     """
     _require(days, DAYS_COLUMNS, "la entrega")
     _require(series, SERIES_COLUMNS, "los datos de las series")
@@ -426,6 +439,11 @@ def load_delivery(conn: sqlite3.Connection, days: pd.DataFrame, cube: tuple[np.n
             conn.execute("ROLLBACK")
         logger.warning("load %s rolled back: the warehouse keeps what it had", run_key)
         raise
+    if interim_dir is not None:
+        try:
+            store_delivery_cube(interim_dir, spec.delivery_id, *cube)
+        except BaseException as error:
+            raise CubeStoreError(spec.delivery_id, error) from error
     logger.info("load %s: delivery=%s series_days=%d profile_rows=%d staged=%d controls=%d", run_key, spec.delivery_id, loaded, len(profile), staged, len(checks))
     return LoadResult(spec.delivery_id, spec.as_of, loaded, len(profile), staged, checks)
 

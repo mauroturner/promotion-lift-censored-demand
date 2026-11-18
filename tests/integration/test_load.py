@@ -16,10 +16,12 @@ import pandas as pd
 import pytest
 
 from promolift import warehouse
+from promolift.cube import InterimError, open_loaded_cube, store_delivery_cube
 from promolift.days import STATE_NAMES, day_band, day_state
 from promolift.split import BLOCKS, block_of
 from promolift.warehouse import (
     CheckFailedError,
+    CubeStoreError,
     DeliveryAlreadyLoadedError,
     EmptyDeliveryError,
     apply_schema,
@@ -51,10 +53,10 @@ def spec_of(published, delivery_id):
     return next(s for s in published.plan if s.delivery_id == delivery_id)
 
 
-def load(conn, published, canonical, cfg, delivery_id, *, days=None, cube=None, series=None, run_key="run-1"):
+def load(conn, published, canonical, cfg, delivery_id, *, days=None, cube=None, series=None, run_key="run-1", interim_dir=None):
     entry, own_days, own_cube = published.items[delivery_id]
     return load_delivery(conn, own_days if days is None else days, own_cube if cube is None else cube, spec_of(published, delivery_id), run_key, cfg,
-                         sha256=entry.sha256, series=canonical.series if series is None else series)
+                         sha256=entry.sha256, series=canonical.series if series is None else series, interim_dir=interim_dir)
 
 
 @pytest.fixture
@@ -468,3 +470,55 @@ def test_a_failed_staging_rebuild_leaves_the_warehouse_as_it_was(after_launch, c
     finally:
         conn.close()
     assert warehouse.CHECK_GROUPS == ("load", "model")
+
+
+# --- the cube of the loaded deliveries ----------------------------------------------------------------------------------------------------------------
+
+
+def tree(root: Path) -> dict[str, str]:
+    return {p.relative_to(root).as_posix(): sha(p) for p in sorted(root.rglob("*")) if p.is_file()} if root.exists() else {}
+
+
+def test_a_load_copies_the_hours_to_the_cube_after_the_commit_and_a_rejected_load_leaves_the_cube_as_it_was(db, published, canonical, cfg, tmp_path):
+    interim = tmp_path / "interim"
+    conn = connect(db)
+    try:
+        load(conn, published, canonical, cfg, "L2024-06-25", interim_dir=interim)
+        loaded = open_loaded_cube(interim)
+        assert loaded.date_keys.tolist() == canonical.date_keys[:90].tolist() and 20240626 not in loaded
+        before = tree(interim / "cube")
+        _entry, days, cube = published.items["D2024-06-26"]
+        broken = days.copy()
+        broken.loc[3, "instock_hours"] += 1
+        with pytest.raises(CheckFailedError):
+            load(conn, published, canonical, cfg, "D2024-06-26", days=broken, interim_dir=interim)
+        with pytest.raises(sqlite3.IntegrityError):
+            load(conn, published, canonical, cfg, "D2024-06-26", days=pd.concat([days, days.iloc[[4]]], ignore_index=True), interim_dir=interim)
+        with pytest.raises(DeliveryAlreadyLoadedError):
+            load(conn, published, canonical, cfg, "L2024-06-25", interim_dir=interim)
+        assert tree(interim / "cube") == before, "a rejected load does not touch the cube"
+        load(conn, published, canonical, cfg, "D2024-06-26", interim_dir=interim)
+        assert open_loaded_cube(interim).date_keys.tolist() == canonical.date_keys[:91].tolist()
+        day = canonical.date_keys.tolist().index(20240626)
+        assert np.array_equal(open_loaded_cube(interim).sales(20240626), canonical.sales[:, day, :])
+    finally:
+        conn.close()
+
+
+def test_a_failure_while_copying_the_cube_leaves_the_delivery_loaded_and_says_so(db, published, canonical, cfg, tmp_path, monkeypatch):
+    interim = tmp_path / "interim"
+    conn = connect(db)
+    try:
+        monkeypatch.setattr(warehouse, "store_delivery_cube", lambda *a, **k: (_ for _ in ()).throw(OSError("disk full")))
+        with pytest.raises(CubeStoreError, match=r"L2024-06-25 quedó cargada en el almacén pero su cubo no se copió.*disk full.*R12") as raised:
+            load(conn, published, canonical, cfg, "L2024-06-25", interim_dir=interim)
+        assert isinstance(raised.value.__cause__, OSError)
+        assert conn.execute("SELECT status FROM deliveries").fetchall() == [("loaded",)] and conn.execute("SELECT COUNT(*) FROM series_days").fetchone()[0] == 27000
+        with pytest.raises(InterimError, match="manifiesto"):
+            open_loaded_cube(interim)
+        monkeypatch.undo()
+        keys, sales, stock = published.items["L2024-06-25"][2]
+        store_delivery_cube(interim, "L2024-06-25", keys, sales, stock)       # storing again finishes the job
+        assert open_loaded_cube(interim).date_keys.tolist() == canonical.date_keys[:90].tolist()
+    finally:
+        conn.close()
