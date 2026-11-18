@@ -7,6 +7,7 @@ files, the rendered design and the figures) are added by the unit that writes th
 from __future__ import annotations
 
 import gc
+import os
 import shutil
 from collections.abc import Callable
 from pathlib import Path
@@ -21,6 +22,15 @@ pytest_plugins = ["pytester"]
 # garbage collector walks all of them again. The thresholds are raised so that it runs far less often; garbage in cycles is still freed, only
 # later. It changes no value and no test (project 04, D93).
 gc.set_threshold(200_000, 100, 100)
+
+@pytest.fixture(scope="session", autouse=True)
+def _no_flush_to_the_device():
+    """``os.fsync`` makes a file survive a power cut, which no test can cause, and on this machine it takes about a seventh of the time of the suite (every atomic write, the
+    registry and the lock call it; D29). The session runs without it; a test that is about the flush replaces ``os.fsync`` with its own spy, which wins over this one."""
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(os, "fsync", lambda descriptor: None)
+        yield
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REAL_TRAIN = PROJECT_ROOT / "data" / "raw" / "train.parquet"

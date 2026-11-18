@@ -37,6 +37,7 @@ from tests.fixtures.pipeline_state import (
     state_of,
     tamper_delivery,
     tree_digest,
+    tree_state,
 )
 
 
@@ -97,20 +98,20 @@ def test_a_task_of_a_run_that_did_not_load_its_own_delivery_is_refused_and_write
     state = copy_state(pipeline_staged("deliver"), tmp_path / "state", quick_cfg)
     cfg = state.cfg
     assert state_file(cfg, "a")["tasks"]["deliver"]["delivery_id"] == DAILY_ID
-    before = tree_digest(state.root)
+    before = tree_state(state.root)
     for task_id in TASK_IDS[TASK_IDS.index("recover"):]:
         with pytest.raises(RunRefusedError, match="no la cargó") as refused:
             pipeline.run_task(task_id, "a", cfg)
         assert refused.value.exit_code == 2
-    assert tree_digest(state.root) == before
+    assert tree_state(state.root) == before
     advance(cfg, "owner", "load")
     assert query(cfg, "SELECT run_key FROM deliveries WHERE delivery_id = ?", (DAILY_ID,)) == [("owner",)]
-    before = tree_digest(state.root)
+    before = tree_state(state.root)
     for task_id in TASK_IDS[TASK_IDS.index("load"):]:
         with pytest.raises(RunRefusedError, match="la cargó la corrida owner") as refused:
             pipeline.run_task(task_id, "a", cfg)
         assert refused.value.exit_code == 2
-    assert tree_digest(state.root) == before
+    assert tree_state(state.root) == before
 
 
 def test_load_is_refused_without_a_passed_validation_of_this_run(pipeline_staged, tmp_path, quick_cfg):
@@ -119,17 +120,17 @@ def test_load_is_refused_without_a_passed_validation_of_this_run(pipeline_staged
     state = copy_state(pipeline_staged("deliver"), tmp_path / "state", quick_cfg)
     cfg = state.cfg
     assert (Path(cfg.paths.reports_dir) / "validation" / "latest.json").is_file()      # the launch run's, not this one's
-    before = tree_digest(state.root)
+    before = tree_state(state.root)
     with pytest.raises(RunRefusedError, match="no validó su entrega") as refused:
         pipeline.run_task("load", "a", cfg)
-    assert refused.value.exit_code == 2 and tree_digest(state.root) == before
+    assert refused.value.exit_code == 2 and tree_state(state.root) == before
     tamper_delivery(cfg, DAILY_ID)
     with pytest.raises(ValidationError, match="V13"):
         pipeline.run_task("validate", "a", cfg)
-    before = tree_digest(state.root)
+    before = tree_state(state.root)
     with pytest.raises(RunRefusedError, match="rechazó su entrega") as refused:
         pipeline.run_task("load", "a", cfg)
-    assert refused.value.exit_code == 2 and tree_digest(state.root) == before
+    assert refused.value.exit_code == 2 and tree_state(state.root) == before
     assert query(cfg, "SELECT COUNT(*) FROM series_days WHERE delivery_id = ?", (DAILY_ID,)) == [(0,)] and "a" not in runs_of(cfg)
 
 
@@ -171,12 +172,12 @@ def test_a_task_from_load_on_of_a_run_that_holds_no_delivery_is_refused_before_i
     created, so nothing is written and no run is left ``failed``; the tasks before ``load`` open a new run as before."""
     state = copy_state(pipeline_launched, tmp_path / "state", quick_cfg)
     cfg = state.cfg
-    before = tree_digest(state.root)
+    before = tree_state(state.root)
     for task_id in TASK_IDS[TASK_IDS.index("load"):]:
         with pytest.raises(RunRefusedError, match="no tiene una entrega") as refused:
             pipeline.run_task(task_id, "fresh", cfg)
         assert refused.value.exit_code == 2
-    assert tree_digest(state.root) == before and not (Path(cfg.paths.interim_dir) / "runs" / "fresh.json").exists() and runs_of(cfg) == {"launch": "ok"}
+    assert tree_state(state.root) == before and not (Path(cfg.paths.interim_dir) / "runs" / "fresh.json").exists() and runs_of(cfg) == {"launch": "ok"}
     assert pipeline.run_task("fetch_source", "fresh", cfg)["train_sha256"] and state_file(cfg, "fresh")["status"] == "running"
 
 
@@ -237,10 +238,10 @@ def test_a_v01_rejection_writes_only_the_validation_report_and_the_run_state(pip
     cfg = state.cfg
     source = Path(cfg.source.train_path)
     source.write_bytes(source.read_bytes() + b"changed after the hash was pinned")
-    before = tree_digest(state.root)
+    before = tree_state(state.root)
     with pytest.raises(ValidationError, match="V01"):
         pipeline.run_task("fetch_source", "v01", cfg)
-    after = tree_digest(state.root)
+    after = tree_state(state.root)
     changed = sorted(path for path in set(before) | set(after) if before.get(path) != after.get(path))
     changed = [path for path in changed if path != "source/train.parquet"]
     assert changed == ["interim/runs/v01.json", "reports/validation/history/v01.json", "reports/validation/history/v01.md",
@@ -365,12 +366,12 @@ def test_a_run_whose_delivery_is_not_the_latest_loaded_refuses_the_model_tasks(p
     mark_delivery(manifest_of(cfg), DAILY_ID, "loaded", "a")       # what the close of "a" does last
     advance(cfg, "new", "load")
     assert query(cfg, "SELECT delivery_id FROM deliveries WHERE run_key = 'new'") == [("D2024-06-27",)]
-    before = tree_digest(state.root)
+    before = tree_state(state.root)
     for task_id in ("recover", "fit_model", "estimate", "evaluate"):
         with pytest.raises(RunRefusedError, match="calcula la última") as refused:
             pipeline.run_task(task_id, "a", cfg)
         assert refused.value.exit_code == 2
-    assert tree_digest(state.root) == before
+    assert tree_state(state.root) == before
 
 
 def test_a_run_that_holds_a_delivery_cannot_deliver_another_one(pipeline_staged, tmp_path, quick_cfg):
@@ -380,10 +381,10 @@ def test_a_run_that_holds_a_delivery_cannot_deliver_another_one(pipeline_staged,
     assert pipeline.run_task("deliver", "a", cfg)["delivery_id"] == DAILY_ID
     advance(cfg, "b", "load")
     mark_delivery(manifest_of(cfg), DAILY_ID, "loaded", "b")         # what the close of "b" does last
-    before = tree_digest(state.root)
+    before = tree_state(state.root)
     with pytest.raises(RunRefusedError, match="una corrida no cambia de entrega") as refused:
         pipeline.run_task("deliver", "a", cfg)
-    assert refused.value.exit_code == 2 and tree_digest(state.root) == before
+    assert refused.value.exit_code == 2 and tree_state(state.root) == before
 
 
 def test_the_test_is_not_evaluated_under_another_configuration_before_its_seal_and_the_refusal_exits_2(pipeline_before_close, tmp_path, quick_cfg):
@@ -393,14 +394,14 @@ def test_the_test_is_not_evaluated_under_another_configuration_before_its_seal_a
     cfg = state.cfg
     assert json.loads(Path(cfg.paths.seal).read_text(encoding="utf-8")).get("test") is None
     other = dataclasses.replace(cfg, bootstrap=dataclasses.replace(cfg.bootstrap, seed=cfg.bootstrap.seed + 1))
-    before = tree_digest(state.root)
+    before = tree_state(state.root)
     for task_id in TASK_IDS:
         with pytest.raises(RunRefusedError, match=r"bootstrap\.seed") as refused:
             pipeline.run_task(task_id, "other", other)
         assert refused.value.exit_code == 2
     with pytest.raises(RunRefusedError, match=r"bootstrap\.seed"):
         pipeline.run_all(other, run_key="other")
-    assert tree_digest(state.root) == before
+    assert tree_state(state.root) == before
     assert pipeline.run_task("fetch_source", "same", cfg)["train_sha256"]
 
 
@@ -412,14 +413,14 @@ def test_every_writing_command_holds_the_writer_lock_and_a_second_writer_writes_
     the same bytes afterwards; while a task runs the file names the command and the run, and it is gone after (also after a task that failed)."""
     state = copy_state(pipeline_launched, tmp_path / "state", quick_cfg)
     cfg = state.cfg
-    before = tree_digest(state.root)
+    before = tree_state(state.root)
     calls = (lambda: pipeline.run_task("fetch_source", "x", cfg), lambda: pipeline.run_all(cfg, run_key="x"), lambda: pipeline.replay(cfg))
     with lock.sole_writer(cfg.paths.interim_dir, "another command", "other"):
         for call in calls:
             error = from_another_thread(call)
             assert isinstance(error, RunLockedError) and error.state == "thread" and error.exit_code == 2
-        assert {k: v for k, v in tree_digest(state.root).items() if k != "interim/pipeline.lock"} == before
-    assert tree_digest(state.root) == before
+        assert {k: v for k, v in tree_state(state.root).items() if k != "interim/pipeline.lock"} == before
+    assert tree_state(state.root) == before
     seen: list[dict | None] = []
 
     def spy(ctx):
@@ -452,12 +453,12 @@ def test_replay_with_nothing_pending_does_not_take_the_lock(pipeline_replayed, t
     """Plan section 22: a ``replay`` with no pending delivery returns at once and does not take the lock (so it runs while another process writes), and writes nothing."""
     state = copy_state(pipeline_replayed, tmp_path / "state", quick_cfg)
     cfg = state.cfg
-    before = tree_digest(state.root)
+    before = tree_state(state.root)
     with lock.sole_writer(cfg.paths.interim_dir, "another command", "other"):
         outcome: dict = {}
         error = from_another_thread(lambda: outcome.update(runs=pipeline.replay(cfg)))
-        assert {k: v for k, v in tree_digest(state.root).items() if k != "interim/pipeline.lock"} == before
-    assert error is None and outcome["runs"] == [] and tree_digest(state.root) == before
+        assert {k: v for k, v in tree_state(state.root).items() if k != "interim/pipeline.lock"} == before
+    assert error is None and outcome["runs"] == [] and tree_state(state.root) == before
 
 
 def test_unknown_tasks_and_incompatible_selections_are_usage_errors_before_writing(pipeline_launched, tmp_path, quick_cfg):
@@ -465,7 +466,7 @@ def test_unknown_tasks_and_incompatible_selections_are_usage_errors_before_writi
     ``UsageError``, and nothing is written."""
     state = copy_state(pipeline_launched, tmp_path / "state", quick_cfg)
     cfg = state.cfg
-    before = tree_digest(state.root)
+    before = tree_state(state.root)
     for call, message in (
         (lambda: pipeline.run_task("nope", "x", cfg), "tarea desconocida"), (lambda: pipeline.run_all(cfg, only=["report"], start="load"), "no se combinan"),
         (lambda: pipeline.run_all(cfg, only=[]), "al menos una tarea"), (lambda: pipeline.replay(cfg, until="D2023-01-01"), "no es una entrega del plan"),
@@ -473,7 +474,7 @@ def test_unknown_tasks_and_incompatible_selections_are_usage_errors_before_writi
     ):
         with pytest.raises(UsageError, match=message):
             call()
-    assert tree_digest(state.root) == before
+    assert tree_state(state.root) == before
 
 
 # --- AC35 and what the flow wraps ------------------------------------------------------------------------------------------------
@@ -533,7 +534,7 @@ def test_the_run_table_and_the_summary_are_rewritten_alone_and_a_set_that_does_n
     state = copy_state(pipeline_staged("render_dashboard"), tmp_path / "state", quick_cfg)
     cfg = state.cfg
     advance_closers = {"outputs": Path(cfg.paths.outputs_dir), "site": Path(cfg.paths.site_dir)}
-    before = {name: tree_digest(folder) for name, folder in advance_closers.items()}
+    before = {name: tree_state(folder) for name, folder in advance_closers.items()}
     fetched = state_file(cfg, "a")["tasks"]["fetch_source"]
     view = pipeline.sealed_view(cfg, fetched["train_sha256"], fetched["eval_sha256"])
     meta = RunMeta("a", pipeline.datetime.fromisoformat(state_file(cfg, "a")["tasks"]["deliver"]["as_of"]))
@@ -542,7 +543,7 @@ def test_the_run_table_and_the_summary_are_rewritten_alone_and_a_set_that_does_n
         conn.execute("UPDATE pipeline_runs SET status = 'ok' WHERE run_key = 'a'")
         assert export_run_table(conn, cfg.paths.outputs_dir, MODEL, meta, view) == Path(cfg.paths.outputs_dir) / "dim_pipeline_run.parquet"
         export_summary(conn, cfg.paths.site_dir, meta, view, seal_path=cfg.paths.seal, max_total_bytes=cfg.site.max_total_bytes)
-        after = {name: tree_digest(folder) for name, folder in advance_closers.items()}
+        after = {name: tree_state(folder) for name, folder in advance_closers.items()}
         assert {k for k in after["outputs"] if after["outputs"][k] != before["outputs"][k]} == {"dim_pipeline_run.parquet", "manifest.json"}
         assert {k for k in after["site"] if after["site"][k] != before["site"][k]} == {"summary.json", "manifest.json"}
         assert verify_star_schema(cfg.paths.outputs_dir) == [] and pipeline.verify_site(cfg.paths.site_dir) == []
@@ -551,11 +552,11 @@ def test_the_run_table_and_the_summary_are_rewritten_alone_and_a_set_that_does_n
         broken.write_bytes(broken.read_bytes() + b"x")
         site_broken = Path(cfg.paths.site_dir) / "data.json"
         site_broken.write_bytes(site_broken.read_bytes() + b" ")
-        kept, kept_site = tree_digest(cfg.paths.outputs_dir), tree_digest(cfg.paths.site_dir)
+        kept, kept_site = tree_state(cfg.paths.outputs_dir), tree_state(cfg.paths.site_dir)
         assert export_run_table(conn, cfg.paths.outputs_dir, MODEL, meta, view) is None
         with pytest.raises(SiteExportError, match="no se reescribe el resumen"):
             export_summary(conn, cfg.paths.site_dir, meta, view, seal_path=cfg.paths.seal, max_total_bytes=cfg.site.max_total_bytes)
-        assert tree_digest(cfg.paths.outputs_dir) == kept and tree_digest(cfg.paths.site_dir) == kept_site
+        assert tree_state(cfg.paths.outputs_dir) == kept and tree_state(cfg.paths.site_dir) == kept_site
     finally:
         conn.close()
 

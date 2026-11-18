@@ -9,6 +9,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import os
 import shutil
 import sqlite3
 import types
@@ -43,12 +44,32 @@ def state_of(root: Path, quick_cfg: Any, source_dir: Path | None = None) -> type
     return types.SimpleNamespace(root=Path(root), cfg=pipeline_config(root, quick_cfg, source_dir))
 
 
+def _copy_or_link(source: str, destination: str) -> str:
+    """The tensors of the interim folder (``canonical/`` and ``cube/``) are linked, not copied: no flow writes them in place (each is written to a temporary file that replaces it,
+    so a link is never changed through another), and they are most of the bytes of a state. Everything else, the source files and the deliveries a test may damage in place included, is
+    copied."""
+    parts = Path(source).parts
+    if "interim" in parts and any(folder in parts for folder in ("canonical", "cube")) and source.endswith(".npy"):
+        try:
+            os.link(source, destination)
+            return destination
+        except OSError:
+            pass
+    return shutil.copy2(source, destination)
+
+
 def copy_state(state: types.SimpleNamespace, target: Path, quick_cfg: Any) -> types.SimpleNamespace:
     """A copy of a state at `target` with its own configuration, for a test that writes. The source files are copied with it (``root/source``)."""
-    shutil.copytree(state.root, target)
+    shutil.copytree(state.root, target, copy_function=_copy_or_link)
     return types.SimpleNamespace(root=Path(target), cfg=dataclasses.replace(
         state.cfg, source=dataclasses.replace(state.cfg.source, train_path=Path(target) / "source" / "train.parquet", eval_path=Path(target) / "source" / "eval.parquet"),
         paths=dataclasses.replace(state.cfg.paths, **{name: Path(target) / relative for name, relative in LAYOUT.items()}), project_root=Path(target)))
+
+
+def tree_state(root: Path) -> dict[str, tuple[int, int]]:
+    """The size and the modification time of every file under `root`, by its path relative to it: two equal states are a folder nothing wrote to (a write, even of the same bytes,
+    changes the time). What the refusals compare, which is cheaper than hashing every file."""
+    return {path.relative_to(root).as_posix(): (path.stat().st_size, path.stat().st_mtime_ns) for path in sorted(Path(root).rglob("*")) if path.is_file()}
 
 
 def tree_digest(root: Path) -> dict[str, str]:
