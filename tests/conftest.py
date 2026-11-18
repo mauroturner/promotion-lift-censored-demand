@@ -471,3 +471,67 @@ def figures_written_for_bytes(site_files, tmp_path_factory: pytest.TempPathFacto
     from promolift.figures import write_figures
 
     return write_figures(site_files.out, tmp_path_factory.mktemp("figures_bytes"))
+
+
+# --- the flow of the small fixture, task by task (U16 on) ------------------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def pipeline_launched(tmp_path_factory: pytest.TempPathFactory, quick_cfg, small_dir):
+    """The launch run of the 60-series fixture, run once through the eleven tasks (``run_all``): ``root``, ``cfg`` and ``results`` (what each task returned). A test that writes
+    works on ``copy_state``."""
+    from promolift import pipeline
+    from tests.fixtures.pipeline_state import state_of
+
+    state = state_of(tmp_path_factory.mktemp("pipeline_launched") / "state", quick_cfg, small_dir)
+    state.results = pipeline.run_all(state.cfg, run_key="launch")
+    return state
+
+
+@pytest.fixture(scope="session")
+def pipeline_staged(tmp_path_factory: pytest.TempPathFactory, pipeline_launched, quick_cfg):
+    """``pipeline_staged(upto)``: a state of the 60-series flow after the launch run in which the run ``a`` took the next pending delivery and ran its tasks up to ``upto``
+    (``deliver``, ``load``, ``recover``, ``render_dashboard``...). Each stage is built once per session on a copy of the nearest earlier one, so the tests that need a run
+    half done copy it instead of running its tasks again. Read-only; a test that writes works on ``copy_state``."""
+    from promolift import pipeline
+    from tests.fixtures.pipeline_state import copy_state
+
+    built: dict[str, object] = {}
+
+    def stage(upto: str):
+        if upto not in built:
+            order = pipeline.TASK_IDS
+            earlier = [task for task in built if order.index(task) < order.index(upto)]
+            base = max(earlier, key=order.index) if earlier else None
+            state = copy_state(built[base] if base else pipeline_launched, tmp_path_factory.mktemp(f"staged_{upto}") / "state", quick_cfg)
+            for task_id in order[(order.index(base) + 1 if base else 0): order.index(upto) + 1]:
+                pipeline.run_task(task_id, "a", state.cfg)
+            built[upto] = state
+        return built[upto]
+
+    return stage
+
+
+@pytest.fixture(scope="session")
+def pipeline_before_close(tmp_path_factory: pytest.TempPathFactory, pipeline_launched, quick_cfg):
+    """A copy of ``pipeline_launched`` with the seven daily deliveries replayed (``runs``): the close is the pending delivery and the seal has no test part."""
+    from promolift import pipeline
+    from tests.fixtures.pipeline_state import copy_state
+
+    state = copy_state(pipeline_launched, tmp_path_factory.mktemp("pipeline_before_close") / "state", quick_cfg)
+    state.runs = pipeline.replay(state.cfg, until="D2024-07-02")
+    return state
+
+
+@pytest.fixture(scope="session")
+def pipeline_replayed(tmp_path_factory: pytest.TempPathFactory, pipeline_before_close, quick_cfg):
+    """The whole plan, built once from a copy of ``pipeline_before_close``: the close run after the seven daily ones (``runs``, eight in all), and then a run with no delivery left
+    (``idle``); ``before_idle`` is the digest of what is published before that last run."""
+    from promolift import pipeline
+    from tests.fixtures.pipeline_state import copy_state, published_digest
+
+    state = copy_state(pipeline_before_close, tmp_path_factory.mktemp("pipeline_replayed") / "state", quick_cfg)
+    state.runs = [*pipeline_before_close.runs, *pipeline.replay(state.cfg)]
+    state.before_idle = published_digest(state.cfg)
+    state.idle = pipeline.run_all(state.cfg, run_key="idle")
+    return state

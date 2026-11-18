@@ -394,4 +394,30 @@ def export_site(conn: sqlite3.Connection, out_dir: Path, run: RunMeta, view: Any
     return _write({name: _text({**header, **documents[name]}) for name in SITE_FILES}, out_dir, max_total_bytes, header)
 
 
-__all__ = ["MANIFEST_FILE", "SITE_FILES", "SiteExportError", "SiteFiles", "SiteSetError", "export_site", "read_site", "verify_site"]
+def export_summary(conn: sqlite3.Connection, out_dir: Path, run: RunMeta, view: Any, *, seal_path: Path, max_total_bytes: int) -> Path:
+    """Rewrite only ``summary.json`` (what closing a run changes: its status) and the manifest with it, the manifest removed before and written again last. The other four must be
+    one export of this same run: over a folder that is not one, or is of another run, nothing is written (``SiteExportError``)."""
+    _require_star(conn)
+    header = _header(run, view)
+    out_dir = Path(out_dir)
+    problems = verify_site(out_dir)
+    if not problems and json.loads((out_dir / MANIFEST_FILE).read_text(encoding="utf-8"))["run_key"] != header["run_key"]:
+        problems = ["el conjunto es de otra corrida"]
+    if problems:
+        raise SiteExportError(f"no se reescribe el resumen: {'; '.join(problems)}; la tarea export escribe los cinco archivos de nuevo")
+    summary = build_summary(conn, view, run=run, seal_path=seal_path)
+    payloads = {name: (out_dir / name).read_bytes() for name in SITE_FILES if name != "summary.json"}
+    payloads["summary.json"] = _text({**header, **_summary(conn, run, view, summary, read_seal(seal_path))}).encode("utf-8")
+    total = sum(len(p) for p in payloads.values())
+    if total > max_total_bytes:
+        raise SiteExportError(f"los archivos del sitio pesan {total} bytes y el tope es {max_total_bytes}: no se escribió ninguno")
+    manifest = _text({**header, "files": {n: {"bytes": len(payloads[n]), "sha256": hashlib.sha256(payloads[n]).hexdigest()} for n in SITE_FILES}})
+    (out_dir / MANIFEST_FILE).unlink(missing_ok=True)
+    path = write_atomic(out_dir / "summary.json", payloads["summary.json"])
+    write_atomic(out_dir / MANIFEST_FILE, manifest)
+    logger.info("site summary %s rewritten: %d bytes", header["run_key"], len(payloads["summary.json"]))
+    return path
+
+
+
+__all__ = ["MANIFEST_FILE", "SITE_FILES", "SiteExportError", "SiteFiles", "SiteSetError", "export_site", "export_summary", "read_site", "verify_site"]

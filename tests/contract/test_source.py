@@ -74,6 +74,7 @@ def test_the_valid_fixture_is_read_once_into_the_canonical_tables(cfg_for, small
     assert result["built"] is True and (result["train_sha256"], result["eval_sha256"]) == (small_truth.train_sha256, small_truth.eval_sha256)
     assert (result["series"], result["days"], result["series_days"]) == (60, 97, 60 * 97) and result["rows"] == {"train": 5400, "eval": 420}
     assert result["day_state"] == small_truth.rule_counts()["day_state"] and result["sale_amount_mismatch"] == 0 and result["stock_count_mismatch"] == 0
+    assert [result[f"{k}_{split}"] for k in ("sale_amount_mismatch", "stock_count_mismatch") for split in ("train", "eval")] == [0, 0, 0, 0], "kept per file for V26 and V27 of the run (U16)"
     folder = tmp_path / "interim"
     assert canonical_state(folder) == (small_truth.train_sha256, small_truth.eval_sha256)
     assert sorted(p.name for p in folder.iterdir()) == ["canonical", INTERIM_MANIFEST, "series.parquet", "series_days.parquet"]

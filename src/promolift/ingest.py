@@ -502,6 +502,8 @@ def fetch_source(cfg: PipelineConfig) -> dict[str, Any]:
     canon = canonical((train, eval_), cfg)
     canon.counts["sale_amount_mismatch"] = train_report.sale_amount_mismatch + eval_report.sale_amount_mismatch
     canon.counts["stock_count_mismatch"] = train_report.stock_count_mismatch + eval_report.stock_count_mismatch
+    for split, report in (("train", train_report), ("eval", eval_report)):      # which file each total comes from, for V26 and V27 of the run (U16)
+        canon.counts[f"sale_amount_mismatch_{split}"], canon.counts[f"stock_count_mismatch_{split}"] = report.sale_amount_mismatch, report.stock_count_mismatch
     write_canonical(canon, interim_dir, train_sha, eval_sha)
     register()
     return result | {"built": True, **canon.counts}
