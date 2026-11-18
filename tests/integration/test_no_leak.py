@@ -144,3 +144,30 @@ def test_a_block_of_days_is_each_day_of_the_cube_in_the_order_asked_for(launch_s
         frame = canonical.series_days[canonical.series_days["date_key"] == key].sort_values("series_key")
         assert np.array_equal(block.state[:, position], frame["day_state"].to_numpy()) and np.array_equal(block.band[:, position], frame["band"].to_numpy())
         assert block.day(position).date_key == key and np.array_equal(block.day(position).sales, block.sales[:, position, :])
+
+
+def test_a_block_of_more_series_than_an_int16_holds_keeps_every_series_key_and_state(quick_cfg):
+    """The real file has 50,000 series: a key past 32,767 must not wrap (found by the dry run of the launch on the real train block)."""
+    import sqlite3
+
+    from promolift.cube import load_block
+
+    n = 50_000
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE series (series_key INTEGER PRIMARY KEY, management_group_id INTEGER NOT NULL)")
+    conn.execute("CREATE TABLE series_days (series_key INTEGER, date_key INTEGER, day_state TEXT, band INTEGER)")
+    conn.executemany("INSERT INTO series VALUES (?, ?)", [(k, k % 7) for k in range(n)])
+    conn.executemany("INSERT INTO series_days VALUES (?, 20240601, ?, ?)", [(k, "promo" if k % 2 else "regular", k % 7 if k % 2 else None) for k in range(n)])
+
+    class Cube:
+        n_series = n
+
+        def sales(self, date_key):
+            return np.ones((n, 24), dtype=np.float32)
+
+        def stock(self, date_key):
+            return np.zeros((n, 24), dtype=np.int8)
+
+    block = load_block(Cube(), conn, [20240601], quick_cfg)
+    assert block.series_key.tolist() == list(range(n)) and block.group.tolist() == [k % 7 for k in range(n)]
+    assert block.state[:, 0].tolist() == [0 if k % 2 else 1 for k in range(n)] and block.band[:, 0].tolist() == [k % 7 if k % 2 else -1 for k in range(n)]

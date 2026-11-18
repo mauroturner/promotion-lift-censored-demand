@@ -371,7 +371,7 @@ def load_block(cube: Any, conn: sqlite3.Connection, date_keys: Any, view: Any) -
     band = np.empty((n_series, len(keys)), dtype=np.int8)
     for position, key in enumerate(keys.tolist()):
         rows = np.array(conn.execute(f"SELECT series_key, {_STATE_CODES}, COALESCE(band, -1) FROM series_days WHERE date_key = ? ORDER BY series_key",
-                                     (key,)).fetchall(), dtype=np.int16).reshape(-1, 3)
+                                     (key,)).fetchall(), dtype=np.int32).reshape(-1, 3)
         if len(rows) != n_series or not np.array_equal(rows[:, 0], np.arange(n_series)):
             raise InterimError(f"el almacén tiene {len(rows)} series-días del día {key} y el cubo {n_series} series (runbook R12)")
         state[:, position], band[:, position] = rows[:, 1], rows[:, 2]
