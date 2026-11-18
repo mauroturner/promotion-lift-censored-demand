@@ -132,3 +132,23 @@ def informative_verdict(variants: int, days: int) -> str:
 def cannot(why: str) -> str:
     """The verdict of a criterion that cannot be computed: it is never passed (requirements, section 8.1)."""
     return f"No se puede calcular: {why}."
+
+
+# --- the labels of the star model (U12; plan, section 19) -------------------------------------------------------------------------------------------------------
+
+VERSIONS_ES = {"raw": "venta cruda", "recovered": "demanda recuperada"}
+BLOCKS_ES = {"train": "Entrenamiento", "purge": "Purga", "valid_v1": "Validación V1", "valid_v2": "Validación V2", "test": "Prueba", "outside": "Fuera de los bloques"}
+WEEKDAYS_ES = ("domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado")       # SQLite's strftime('%w'): 0 is Sunday
+METHOD_KINDS_ES = {"recovery": "recuperación", "forecast": "pronóstico"}
+SEVERITY_ES = {"blocking": "bloqueante", "warning": "advertencia", "info": "informativa"}
+
+
+def band_label(bands: tuple[float, ...], band: int) -> str:
+    """The depth of a band as the dashboard says it («más del 50 %», «40 a 50 %», ..., «hasta 5 %»), from the edges of the bands over the discount: the depth is
+    one minus the discount, so the first band is the deepest and the last the shallowest."""
+    low, high = round((1.0 - bands[band + 1]) * 100), round((1.0 - bands[band]) * 100)
+    if band == 0:
+        return f"más del {low} %"
+    if band == len(bands) - 2:
+        return f"hasta {high} %"
+    return f"{low} a {high} %"

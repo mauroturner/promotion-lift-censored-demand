@@ -39,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 SQL_DIR = Path(__file__).resolve().parents[2] / "sql"
 CHECK_GROUPS = ("load", "model")
+MART_GROUPS = ("powerbi",)
 SAMPLE_LIMIT = 5
 SAMPLE_SERIES_DAYS = 1000      # chk_sums_match_cube: the series-days of a delivery compared with its cube (every one when it has fewer)
 SUM_TOLERANCE = 1e-6           # chk_sums_match_cube and chk_profile_matches_days
@@ -248,6 +249,19 @@ def apply_schema(conn: sqlite3.Connection) -> None:
             conn.execute("COMMIT")
 
 
+def rebuild_marts(conn: sqlite3.Connection, group: Literal["powerbi"], params: Mapping[str, object] | None = None) -> list[str]:
+    """Rebuild the marts of a group (``sql/marts/<group>/mart_*.sql``, in file-name order) inside the caller's transaction: each file drops its table and creates it
+    again from the tables it reads, so a rollback undoes it too. Returns the names of the files run."""
+    if group not in MART_GROUPS:
+        raise ValueError(f"grupo de marts desconocido: {group!r}; se esperaba uno de {', '.join(MART_GROUPS)}")
+    if not conn.in_transaction:
+        raise RuntimeError("los marts se reconstruyen dentro de una transacción abierta, para que una falla los deshaga")
+    paths = sorted((SQL_DIR / "marts" / group).glob("mart_*.sql"))
+    for path in paths:
+        run_sql_file(conn, path, params)
+    return [path.stem for path in paths]
+
+
 # --- controls --------------------------------------------------------------------------------------------------------------
 
 
@@ -383,6 +397,14 @@ def _profile_rows(days: pd.DataFrame, cube: tuple[np.ndarray, np.ndarray, np.nda
 def _rebuild(conn: sqlite3.Connection, as_of: datetime, view: Any) -> None:
     for name in STAGING:
         run_sql_file(conn, SQL_DIR / name, sql_params(as_of, view))
+
+
+def stage_series_days(conn: sqlite3.Connection, as_of: datetime, view: Any) -> None:
+    """Rebuild ``stg_series_days`` for the instant `as_of` inside the caller's open transaction (``rebuild_staging`` is the same with a transaction and the load controls of
+    its own): what a calculation for an instant reads is what had closed at it."""
+    if not conn.in_transaction:
+        raise RuntimeError("la preparación de las series-días se reconstruye dentro de una transacción abierta, para que una falla la deshaga")
+    _rebuild(conn, as_of, view)
 
 
 def load_delivery(conn: sqlite3.Connection, days: pd.DataFrame, cube: tuple[np.ndarray, np.ndarray, np.ndarray], spec: DeliverySpec, run_key: str,

@@ -206,7 +206,9 @@ def test_a_group_that_does_not_exist_is_refused_and_an_empty_warehouse_passes_ev
     results = run_checks(conn, "load", sql_params(datetime(2024, 6, 26), cfg))
     assert [r.check_id for r in results] == ["chk_day_state_rules", "chk_delivery_period", "chk_hours_add_up", "chk_profile_matches_days", "chk_series_day_unique"]
     assert all(r.violations == 0 and r.sample == [] for r in results)
-    assert run_checks(conn, "model") == []
+    # the group of the model (U12) holds the controls of the star model: those that read only the warehouse's own tables pass on an empty one
+    model = run_checks(conn, "model", only=["chk_forecasts_only_promo_days", "chk_four_forecasts_per_series_day"])
+    assert [r.check_id for r in model] == ["chk_forecasts_only_promo_days", "chk_four_forecasts_per_series_day"] and all(r.violations == 0 for r in model)
     only = run_checks(conn, "load", sql_params(datetime(2024, 6, 26), cfg), only=["chk_hours_add_up"])
     assert [r.check_id for r in only] == ["chk_hours_add_up"]
     with pytest.raises(ValueError, match="chk_nope"):

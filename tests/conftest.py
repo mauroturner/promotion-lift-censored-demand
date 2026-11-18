@@ -406,3 +406,31 @@ def evaluated_week(issued_week, launch_config, tmp_path_factory: pytest.TempPath
     out = evaluate(w.conn, w.cube, issued_week.bundle, issued_week.run, w.view, seal_path=w.seal)
     w.conn.close()
     return SimpleNamespace(**{**vars(w), "out": out, "bundle": issued_week.bundle, "run": issued_week.run, "folder": w.db.parent})
+
+
+# --- the star model of Power BI (U12 on) --------------------------------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def star_export(evaluated_week, launch_config, tmp_path_factory: pytest.TempPathFactory):
+    """The star model exported once from a copy of the evaluated week, with two runs and their validation rules written into the copy first (nothing else writes them
+    yet): ``out`` (the folder of the Parquet files), ``paths``, ``db``, ``view``, ``run``, ``cfg``. Read-only; a test that writes works on a ``clone``."""
+    from types import SimpleNamespace
+
+    from promolift.dashboard.semantic_model import MODEL
+    from promolift.export import export_star_schema
+    from promolift.registry import RunMeta
+    from tests.fixtures.weeks import clone
+
+    folder = tmp_path_factory.mktemp("star_export")
+    w = clone(evaluated_week.folder, folder / "w", launch_config, evaluated_week.view.train_sha256_seen, evaluated_week.view.eval_sha256_seen)
+    for run_key, status, as_of in (("run-launch", "ok", "2024-06-26 00:00:00"), ("run-close", "ok", "2024-07-03 00:00:00")):
+        w.conn.execute("INSERT INTO pipeline_runs VALUES (?, '2026-11-18 10:00:00', '2026-11-18 10:01:00', ?, NULL, ?, ?, ?, 0, 0, 100.5, 120.5, 'PeakWorkingSetSize', 'ok')",
+                       (run_key, status, as_of, evaluated_week.view.train_sha256_seen, evaluated_week.view.eval_sha256_seen))
+        for rule, name, severity, passed in (("V10", "La entrega es la siguiente del plan", "blocking", 1), ("V20", "Descuento 0", "warning", 0), ("I01", "Horas sin stock de noche", "info", 0)):
+            w.conn.execute("INSERT INTO validation_results VALUES (?, ?, ?, ?, 'delivery', 'per_run', ?, 3, 48, '[]')", (run_key, rule, name, severity, passed))
+    run = RunMeta("run-close", evaluated_week.run.as_of)
+    out = folder / "powerbi"
+    paths = export_star_schema(w.conn, out, MODEL, run, w.view, seal_path=w.seal, interim_dir=w.cfg.paths.interim_dir)
+    w.conn.close()
+    return SimpleNamespace(out=out, paths=paths, db=w.db, view=w.view, run=run, cfg=w.cfg, seal=w.seal, folder=w.db.parent)
