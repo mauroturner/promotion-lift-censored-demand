@@ -14,6 +14,7 @@ the same color and the page says that they do not differ from each other (D13). 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from html import escape
 from pathlib import Path
 
@@ -351,17 +352,21 @@ def _runs(data: _Data) -> str:
                        [[r.run_key, r.delivery_id or DASH, _when(r.as_of), r.status, _int(r.rows_issued), r.message or ""] for r in runs.head(TABLE_ROWS).itertuples()], {4})
 
 
-def _preview(data: _Data, v: Visual) -> str:
-    """The body of a visual: its drawing or figure from the exported tables."""
-    if v.kind == "slicer":
-        return _slicer(data, v.fields[0])
-    if v.kind == "card":
-        maker = _cards(data).get(v.fields[0])
-        return maker() if maker else _note("Se calcula en Power BI.")
-    makers = {
+NOT_FILTERED_MARK = " (no lo"
+
+
+def _bare_title(title: str) -> str:
+    """A visual's title without the note that says what its slicers do not filter (``semantic_model.NOT_FILTERED``): the key of its preview."""
+    return title.split(NOT_FILTERED_MARK, 1)[0]
+
+
+def _makers(data: _Data, v: Visual) -> dict[str, Callable[[], str]]:
+    """The drawing of each visual that is not a slicer or a card, by its title without the not-filtered note."""
+    return {
         "Celdas ordenadas por aumento, con su intervalo y su grupo indistinguible": lambda: _cell_intervals(data, v),
         "Celdas con pocas series, sin ordenar": lambda: _unranked(data),
         "Tasa de quiebre y venta media por hora": lambda: _hour_lines(data, v),
+        "Un día de ejemplo: venta observada y recuperada por hora": lambda: _example_day(data, v),
         "Comprobación de la recuperación en V1, V2 y la prueba": lambda: _recovery_table(data),
         "Demanda recuperada (%) por grupo": lambda: _recovered_by_group(data, v),
         "Aumento por banda de descuento, en las dos versiones": lambda: _band_bars(data, v),
@@ -377,13 +382,16 @@ def _preview(data: _Data, v: Visual) -> str:
         "Reglas de validación": lambda: _rules(data),
         "Corridas": lambda: _runs(data),
     }
-    if v.title_es.startswith("Un día de ejemplo"):
-        return _example_day(data, v)
-    if v.title_es.startswith("Comprobación de la recuperación"):
-        return _recovery_table(data)
-    if v.title_es.startswith("Demanda recuperada (%) por grupo"):
-        return _recovered_by_group(data, v)
-    maker = makers.get(v.title_es)
+
+
+def _preview(data: _Data, v: Visual) -> str:
+    """The body of a visual: its drawing or figure from the exported tables."""
+    if v.kind == "slicer":
+        return _slicer(data, v.fields[0])
+    if v.kind == "card":
+        maker = _cards(data).get(v.fields[0])
+        return maker() if maker else _note("Se calcula en Power BI.")
+    maker = _makers(data, v).get(_bare_title(v.title_es))
     return maker() if maker else _note("Se calcula en Power BI.")
 
 

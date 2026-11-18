@@ -79,3 +79,22 @@ def test_an_incoherent_model_writes_nothing_and_the_file_is_written_whole(star_e
     before = target.read_bytes()
     render_design(MODEL, star_export.out, target, star_export.run)
     assert target.read_bytes() == before and not list(tmp_path.glob("*.tmp"))
+
+
+def test_every_visual_of_every_page_gets_its_preview_drawn_from_the_exported_files(star_export):
+    from promolift.dashboard.render import _Data, _note, _preview
+
+    data = _Data(star_export.out, MODEL)
+    undrawn = _note("Se calcula en Power BI.")
+    missing = [v.title_es for page in PAGES for v in page.visuals if _preview(data, v) == undrawn]
+    assert missing == [], "a visual whose title carries the not-filtered note must still find its preview by the title it had without it"
+
+
+def test_every_maker_key_is_the_bare_title_of_a_visual_and_every_visual_has_a_maker(star_export):
+    """A key that carries a title no visual has is a preview that is never drawn (the review of U13): the makers are keyed by the title without the not-filtered note."""
+    from promolift.dashboard.render import _Data, _makers
+
+    data = _Data(star_export.out, MODEL)
+    visuals = [v for page in PAGES for v in page.visuals if v.kind not in ("slicer", "card")]
+    keys = set(_makers(data, visuals[0]))
+    assert keys == {v.title_es.split(" (no lo")[0] for v in visuals}
