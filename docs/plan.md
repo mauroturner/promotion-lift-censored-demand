@@ -192,7 +192,7 @@ leak_tripwire_ratio = 0.5            # M01
 
 [effect]                             # D09-D11
 ipf_iterations = 30
-versions = ["raw", "recovered"]
+versions = ["raw", "recovered"]       # el único valor aceptado: otro sale con 2 antes de escribir (D47)
 
 [bootstrap]                          # D12
 resamples = 500

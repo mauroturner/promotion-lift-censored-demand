@@ -334,6 +334,9 @@ def test_the_edges_of_the_valid_ranges_are_accepted(tmp_path):
     ('[effect]\nversions = []\n', r"\[effect\] versions"),
     ('[effect]\nversions = ["raw", "weird"]\n', r"\[effect\] versions.*weird"),
     ('[effect]\nversions = ["raw", "raw"]\n', r"\[effect\] versions"),
+    ('[effect]\nversions = ["raw"]\n', r"\[effect\] versions.*\['raw', 'recovered'\]"),             # B2 (L85, D47): a value the flow would not honor
+    ('[effect]\nversions = ["recovered"]\n', r"\[effect\] versions.*\['raw', 'recovered'\]"),
+    ('[effect]\nversions = ["recovered", "raw"]\n', r"\[effect\] versions.*\['raw', 'recovered'\]"),
     ("[days]\nbands = []\n", r"\[days\] bands"),
     ("[days]\nbands = [0.0, 0.5, 0.5, 1.0]\n", r"\[days\] bands.*crecientes"),
     ("[days]\nbands = [0.0, 0.7, 0.6, 1.0]\n", r"\[days\] bands.*crecientes"),

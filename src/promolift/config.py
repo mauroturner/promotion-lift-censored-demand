@@ -464,6 +464,9 @@ def _check(cfg: PipelineConfig) -> None:
 
     _at_least(cfg.effect.ipf_iterations, 1, "[effect] ipf_iterations")
     _names(cfg.effect.versions, EFFECT_VERSION_NAMES, "[effect] versions")
+    if tuple(cfg.effect.versions) != EFFECT_VERSION_NAMES:   # B2 (L85, D47): the flow always computes both, and the key is in the seal's fingerprint
+        raise ValueError(f"[effect] versions: el flujo calcula siempre las dos versiones (C04 resta la cruda de la recuperada), así que el único valor aceptado es "
+                         f"{list(EFFECT_VERSION_NAMES)}; se recibió {list(cfg.effect.versions)}")
 
     b = cfg.bootstrap
     _at_least(b.resamples, 1, "[bootstrap] resamples")

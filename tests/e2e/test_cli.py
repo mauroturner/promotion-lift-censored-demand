@@ -217,6 +217,19 @@ def test_incompatible_options_exit_2_before_writing(project, args, says):
     assert tree_digest(state.root) == before
 
 
+def test_a_configuration_with_only_one_effect_version_exits_2_and_writes_nothing(project):
+    """B2 (L85; D47): the flow always computes both versions (C04 subtracts them), so a configuration that asks for one is refused with 2 before anything is written,
+    instead of being fingerprinted and then ignored. The sealed value keeps running (``test_every_documented_option_changes_the_result``)."""
+    state = project("launched")
+    raw_only = Path(state.root) / "raw_only.toml"
+    raw_only.write_text(f'extends = "{Path(state.config).as_posix()}"\n\n[effect]\nversions = ["raw"]\n', encoding="utf-8", newline="\n")
+    before = tree_digest(state.root)
+    for args in (("replay",), ("run",), ("task", "fetch_source")):
+        result = cli(*args, "--config", str(raw_only))
+        assert result.code == 2 and "[effect] versions" in result.err and result.out == "", (args, result.code, result.err)
+    assert tree_digest(state.root) == before
+
+
 def test_an_unknown_task_or_option_exits_2_from_the_parser(project):
     state = project("launched")
     before = tree_digest(state.root)
