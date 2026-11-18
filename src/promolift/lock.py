@@ -58,6 +58,7 @@ class _Entry:
     token: str
     thread: int
     records: list[dict] = field(default_factory=list)
+    created: list[Path] = field(default_factory=list)   # the folders the outer take made, deepest first: removed with the file while they are empty (A6)
     releasing: bool = False
     released: threading.Event = field(default_factory=threading.Event)
 
@@ -287,6 +288,38 @@ def _create(path: Path, record: dict) -> bool:
     return True
 
 
+FOLDER_ATTEMPTS = 5   # a take whose folder another release removes between its mkdir and its create makes it again, this many times at most
+
+
+def _missing_folders(folder: Path) -> list[Path]:
+    """The folders from `folder` up that do not exist, deepest first, after creating them all: what this take made and its release may remove."""
+    missing, current = [], folder
+    while not current.exists():
+        missing.append(current)
+        current = current.parent
+    folder.mkdir(parents=True, exist_ok=True)
+    return missing
+
+
+def _create_in_folder(path: Path, record: dict) -> bool:
+    """``_create``, making the folder again when another process's release removed it empty in between (A6's other side): the take never fails for that."""
+    for _attempt in range(FOLDER_ATTEMPTS - 1):
+        try:
+            return _create(path, record)
+        except FileNotFoundError:
+            path.parent.mkdir(parents=True, exist_ok=True)
+    return _create(path, record)
+
+
+def _remove_if_empty(folders: list[Path]) -> None:
+    """Remove the folders a take made, deepest first, while each is empty; the first that holds anything (or cannot be removed) stops it. Never raises."""
+    for folder in folders:
+        try:
+            folder.rmdir()
+        except OSError:
+            return
+
+
 def _retrying(action, what: str, path: Path) -> bool:
     """Do `action` (a removal or a rewrite of the lock file), trying again for ``RELEASE_ATTEMPTS`` × ``RELEASE_PAUSE_S`` while the system refuses it because another
     process has the file open (Windows); True if it was done. Never raises an ``OSError``: the lock is bookkeeping of the caller, whose outcome must stand. Any other
@@ -324,7 +357,9 @@ def _rewrite(path: Path, record: dict) -> bool:
 
 
 def acquire(folder: str | os.PathLike, *, command: str, run_key: str | None = None) -> Holding:
-    """Take the lock of `folder` (created if missing) for this process, or raise ``RunLockedError`` without writing anything.
+    """Take the lock of `folder` (created if missing) for this process, or raise ``RunLockedError`` without writing anything. The folders the take created are removed
+    by the outer release while they are empty (A6, D48), so a refused command in a new copy leaves no empty folder; a take whose folder another release removes between
+    its ``mkdir`` and its create makes it again.
 
     The thread that holds it may take it again: the file then says the inner `command` and `run_key` until the inner release, which brings the outer record back; the file
     is removed by the outer release only. Another thread of this process is refused.
@@ -342,17 +377,17 @@ def acquire(folder: str | os.PathLike, *, command: str, run_key: str | None = No
                 entry.records.append(record)
                 break
             else:
-                path.parent.mkdir(parents=True, exist_ok=True)
+                created = _missing_folders(path.parent)
                 token = secrets.token_hex(16)
                 record = {
                     "pid": os.getpid(), "started": _process_start(os.getpid()), "boot": _boot_id(), "host": socket.gethostname(), "command": command,
                     "run_key": run_key, "since": datetime.now(UTC).isoformat(timespec="seconds"), "token": token,
                 }
-                if not _create(path, record):
+                if not _create_in_folder(path, record):
                     holder = read_holder(path.parent)
-                    if holder is not None or path.exists() or not _create(path, record):   # gone between the create and the read: its holder released it; one try more
+                    if holder is not None or path.exists() or not _create_in_folder(path, record):   # gone between the create and the read: its holder released it; one try more
                         raise _refusal(path, holder if holder is not None else read_holder(path.parent)) from None
-                _HELD[path] = _Entry(token, threading.get_ident(), [record])
+                _HELD[path] = _Entry(token, threading.get_ident(), [record], created)
                 return Holding(path, token)
         waiting.wait()
     try:   # the nested take says its record outside the registry: its retries never hold up another folder (project 04's review of U24, R4-001)
@@ -384,7 +419,8 @@ def release(held: Holding) -> None:
         if holder is None or holder.get("token") != held.token:
             logger.warning("lock %s is not this process's any more (removed or taken by another process): left as it is", held.path)
             return
-        _retrying(lambda: held.path.unlink(missing_ok=True), "remove", held.path)
+        if _retrying(lambda: held.path.unlink(missing_ok=True), "remove", held.path):
+            _remove_if_empty(entry.created)
     finally:
         with _REGISTRY:
             if _HELD.get(held.path) is entry:

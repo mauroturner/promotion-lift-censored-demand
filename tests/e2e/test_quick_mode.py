@@ -62,3 +62,15 @@ def test_every_path_of_the_quick_configuration_is_under_data_quick(monkeypatch):
     quick = (PROJECT_ROOT / "data" / "quick").resolve()
     paths = [cfg.source.train_path, cfg.source.eval_path, *vars(cfg.paths).values()]
     assert all(Path(p).resolve().is_relative_to(quick) for p in paths), [str(p) for p in paths]
+
+
+def test_a_refusal_in_a_new_clone_leaves_only_its_configuration(tmp_path):
+    """A6 (L85): a command refused with 2 in a clone that has only ``config/`` leaves nothing behind, not even the empty ``data/quick/interim/`` its lock made."""
+    home, elsewhere = quick_project(tmp_path / "clone"), tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    before = fingerprint(home)
+    with at_home(home, elsewhere):
+        for args in (("task", "load"), ("run", "--only", "validate", "--from", "load"), ("replay", "--until", "X2024-01-01")):
+            result = cli(*args, "--config", "config/pipeline.quick.toml")
+            assert result.code == 2, (args, result.err)
+            assert fingerprint(home) == before and sorted(p.name for p in Path(home).iterdir()) == ["config"], args

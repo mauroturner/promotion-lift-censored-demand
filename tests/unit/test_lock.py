@@ -507,3 +507,35 @@ def test_a_record_that_cannot_be_written_never_leaves_a_lock_file_behind(tmp_pat
     assert not (tmp_path / lock.LOCK_NAME).exists() and lock._HELD == {}
     with lock.sole_writer(tmp_path, "run", "r2"):
         assert lock.read_holder(tmp_path)["run_key"] == "r2"
+
+
+def test_the_folders_the_lock_created_are_removed_with_it_when_nothing_was_written_in_them(tmp_path):
+    """A6 (L85): a refusal in a new copy left ``data/quick/interim/`` behind, empty, because the lock creates its folder. The outer release now removes the folders its take
+    created, deepest first, while they are empty; a folder that was there, or that holds anything, stays."""
+    folder = tmp_path / "data" / "quick" / "interim"
+    with lock.sole_writer(folder, "run", None):
+        assert (folder / lock.LOCK_NAME).is_file()
+    assert not (tmp_path / "data").exists()
+    with lock.sole_writer(folder, "run", None):
+        (folder / "state.json").write_text("{}", encoding="utf-8")
+    assert (folder / "state.json").is_file() and not (folder / lock.LOCK_NAME).exists()
+    with lock.sole_writer(tmp_path / "data" / "quick" / "other", "run", None):
+        pass
+    assert not (tmp_path / "data" / "quick" / "other").exists() and folder.is_dir()
+
+
+def test_a_take_whose_folder_another_release_just_removed_creates_it_again(tmp_path, monkeypatch):
+    """The other side of the removal: between this take's ``mkdir`` and its exclusive create another process's release may remove the empty folder; the take makes it again
+    and takes the lock instead of failing."""
+    folder = tmp_path / "interim"
+    real_create, calls = lock._create, []
+
+    def create_after_the_folder_is_gone(path, record):
+        calls.append(path)
+        if len(calls) == 1:
+            os.rmdir(path.parent)
+        return real_create(path, record)
+
+    monkeypatch.setattr(lock, "_create", create_after_the_folder_is_gone)
+    with lock.sole_writer(folder, "run", None):
+        assert (folder / lock.LOCK_NAME).is_file() and len(calls) == 2

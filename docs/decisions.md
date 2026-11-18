@@ -477,3 +477,13 @@ Estados: **vigente**, **pendiente del dueño**, **reemplazada por Dxx**.
 - **Afecta**: `src/promolift/warehouse.py`, `sql/staging/stg_series_days.sql`, `sql/staging/stg_series_days_extend.sql`, `sql/staging/stg_series_days_meta.sql`, `tests/integration/test_load.py`; el almacén gana la tabla `stg_series_days_meta` y seis disparadores, derivados y reconstruibles; RNF02, AC34; D22.
 - **Quién**: el agente de correcciones (Opus), con la prueba de la extensión vista fallar antes del cambio (la carga ejecutaba `DROP TABLE IF EXISTS stg_series_days`).
 - **Estado**: vigente.
+
+## D48 El bloqueo quita las carpetas que creó si quedan vacías (A6), y vuelve a crearlas si otra liberación las quitó en el medio
+
+- **Contexto**: la evaluación (L85, A6) encontró que un rechazo en una copia nueva deja vacía la carpeta `data/quick/interim/`: `lock.acquire` crea la carpeta del bloqueo (con sus padres) antes de que el comando decida rechazar, y la liberación borra el archivo del bloqueo pero no las carpetas. Ningún archivo queda escrito, que es lo que comparan las pruebas de «nada escrito», pero la copia ya no es la que era.
+- **Opciones**: (a) dejarlo y decirlo; (b) que la liberación externa quite, de la más profunda a la menos, las carpetas que su toma creó, mientras estén vacías, y que una toma cuya carpeta desapareció entre su `mkdir` y su creación exclusiva la cree otra vez; (c) que la línea de comandos borre después de un rechazo las carpetas que no existían antes.
+- **Decisión**: (b), en `src/promolift/lock.py` (`_missing_folders`, `_create_in_folder`, `_remove_if_empty`). `rmdir` solo quita una carpeta vacía, así que una carpeta con el archivo de otro proceso o con lo que escribió la corrida queda. Del otro lado, si un proceso hace su `mkdir` y otro quita la carpeta vacía antes de la creación exclusiva del primero, el primero recibe `FileNotFoundError`, vuelve a crear la carpeta y lo intenta otra vez (hasta `FOLDER_ATTEMPTS`, 5 veces).
+- **Motivo**: (a) deja la copia distinta de lo que el rechazo dice («No se escribió nada»); (c) repartiría la limpieza entre la línea de comandos y el DAG, y no sabría distinguir una carpeta que creó otro proceso al mismo tiempo; (b) la deja en el único lugar que sabe qué creó, y la carrera que abre (quitar la carpeta que otro está por usar) queda cerrada por el reintento, que una prueba fuerza (`tests/unit/test_lock.py::test_a_take_whose_folder_another_release_just_removed_creates_it_again`).
+- **Afecta**: `src/promolift/lock.py`, `tests/unit/test_lock.py`, `tests/e2e/test_quick_mode.py`; AC28, AC29, AC31; D26.
+- **Quién**: el agente de correcciones (Opus), con las dos pruebas del bloqueo y la de la copia nueva vistas fallar antes del cambio.
+- **Estado**: vigente.
