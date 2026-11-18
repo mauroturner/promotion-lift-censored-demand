@@ -72,7 +72,7 @@ Las ubicaciones son las de `b15055c`. Cada hallazgo termina con su **Estado**.
 - **A4.** El «14,7 % empieza a las 6 h» es del entrenamiento (la distribución de la primera hora sin stock que sella el lanzamiento) y las cifras vecinas son de los 90 días. **Estado: corregida en la documentación (D50):** el README rotula el bloque.
 - **A5.** `fact_overall_effect` y `fact_band_effect` no tenían `fit_blocks`. **Estado: corregida en `8b73512` (D49).**
 - **A6.** Un rechazo en una copia nueva dejaba vacía `data/quick/interim/`. **Estado: corregida en `75456e7` (D48).**
-- **A7.** La suite tardó 139,1 s y 131,3 s, contra los 125 s de la ficha. **Estado: remedida** en el último commit de corrección (883 pruebas; 130,99 s y 125,31 s, dos corridas en reposo, dentro del límite de 180 s y del presupuesto de 150 s).
+- **A7.** La suite tardó 139,1 s y 131,3 s, contra los 125 s de la ficha. **Estado: remedida** en el último commit de corrección (883 pruebas; 133,58 s y 135,07 s, dos corridas en reposo en `95f57f7`, dentro del límite de 180 s y del presupuesto de 150 s).
 - **A8.** Dos pruebas versionaban el nombre del usuario; la docstring de `test_real.py` decía «two tests» y son tres; el total de tiempo sumaba duraciones. **Estado: corregida en `8b73512` (D49).**
 - **A9.** `source.dataset_commit` entra en la huella y solo se valida su formato. **Estado: dejada con evidencia (D47):** lo que fija el contenido de los Parquet son sus bytes y su SHA-256, que `fetch_source` comprueba en cada corrida.
 
