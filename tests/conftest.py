@@ -487,13 +487,21 @@ def figures_written_for_bytes(site_files, tmp_path_factory: pytest.TempPathFacto
 
 
 @pytest.fixture(scope="session")
-def pipeline_launched(tmp_path_factory: pytest.TempPathFactory, quick_cfg, small_dir):
+def tiny_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """The 20-series fixture, for the flow of the tasks: what a run does does not depend on how many series it has, and each of its runs costs less."""
+    from tests.fixtures.make_fixture import make_fixture
+
+    return make_fixture(tmp_path_factory.mktemp("tiny_fixture"), series=20, seed=0, signal="lift").dir
+
+
+@pytest.fixture(scope="session")
+def pipeline_launched(tmp_path_factory: pytest.TempPathFactory, quick_cfg, tiny_dir):
     """The launch run of the 60-series fixture, run once through the eleven tasks (``run_all``): ``root``, ``cfg`` and ``results`` (what each task returned). A test that writes
     works on ``copy_state``."""
     from promolift import pipeline
     from tests.fixtures.pipeline_state import state_of
 
-    state = state_of(tmp_path_factory.mktemp("pipeline_launched") / "state", quick_cfg, small_dir)
+    state = state_of(tmp_path_factory.mktemp("pipeline_launched") / "state", quick_cfg, tiny_dir)
     state.results = pipeline.run_all(state.cfg, run_key="launch")
     return state
 

@@ -480,10 +480,10 @@ def test_unknown_tasks_and_incompatible_selections_are_usage_errors_before_writi
 # --- AC35 and what the flow wraps ------------------------------------------------------------------------------------------------
 
 
-def test_two_runs_of_the_launch_from_nothing_give_the_same_content_in_every_parquet_and_json_without_the_run_columns(pipeline_launched, tmp_path, quick_cfg, small_dir):
+def test_two_runs_of_the_launch_from_nothing_give_the_same_content_in_every_parquet_and_json_without_the_run_columns(pipeline_launched, tmp_path, quick_cfg, tiny_dir):
     """AC35, RNF01: the launch run, repeated from nothing, gives the same rows in every Parquet of the star model, the same site files, summary and seal, apart from what names the
     run. (The launch is where the model is fitted and the seal written; the whole synthetic replay twice is the real one of U19.)"""
-    second = state_of(tmp_path / "second", quick_cfg, small_dir)
+    second = state_of(tmp_path / "second", quick_cfg, tiny_dir)
     pipeline.run_all(second.cfg, run_key="again")
     first, again = content_of(pipeline_launched.cfg), content_of(second.cfg)
     assert sorted(first) == sorted(again) and len(first) >= 25
@@ -561,14 +561,14 @@ def test_the_run_table_and_the_summary_are_rewritten_alone_and_a_set_that_does_n
         conn.close()
 
 
-def test_publishing_from_the_interim_folder_gives_the_bytes_of_publishing_from_memory(pipeline_launched, small_dir, cfg, tmp_path):
+def test_publishing_from_the_interim_folder_gives_the_bytes_of_publishing_from_memory(pipeline_launched, tiny_dir, cfg, tmp_path):
     """The ``deliver`` task reads the canonical hours one day at a time from the interim folder: the launch, a daily delivery and the close it publishes are the same bytes
     (the same SHA-256 in the manifest) as ``publish`` gives from the canonical data held in memory."""
     from promolift.deliveries import delivery_plan, publish
     from promolift.ingest import canonical, read_source
     from tests.fixtures.make_fixture import fixture_config
 
-    accepted = fixture_config(cfg, small_dir)
+    accepted = fixture_config(cfg, tiny_dir)
     memory = canonical((read_source(accepted.source.train_path, "train", accepted)[0], read_source(accepted.source.eval_path, "eval", accepted)[0]), accepted)
     interim = pipeline._canonical_of(pipeline_launched.cfg.paths.interim_dir)
     plan = delivery_plan(accepted)
