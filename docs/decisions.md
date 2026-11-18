@@ -226,7 +226,7 @@ Estados: **vigente**, **pendiente del dueño**, **reemplazada por Dxx**.
 - **Motivo**: (a) haría un almacén de varios GB y cargas lentas **[Inferido]**; (c) agrega una tecnología sin necesidad; (b) deja SQL donde el landing lo declara y el cómputo horario en NumPy.
 - **Afecta**: `cube.py`; `warehouse.py`; `sql/`; RNF03, RNF10.
 - **Quién**: agente de planificación.
-- **Estado**: vigente.
+- **Estado**: vigente. **Nota del 2026-11-17 (U04 a U06)**: hay dos cubos. El canónico, `data/interim/canonical/<date_key>.{sales,stock}.npy` (float32 e int8, series × 24, los 97 días desde la primera lectura, con `interim_manifest.json` escrito al final), y el de las entregas cargadas, `data/interim/cube/<delivery_id>.{sales,stock}.npy` (series × días × 24) con su `manifest.json`, que `load_delivery(..., interim_dir=...)` llena **después** del commit de SQLite (una carga rechazada no toca el cubo; si la copia falla, `CubeStoreError` dice que la entrega quedó cargada sin su cubo y copiarla de nuevo termina el trabajo, runbook R12). Las tareas posteriores a `load` leen solo el segundo (`cube.open_loaded_cube`): un día que todavía no se entregó no se ve (RNF06 b). `hour_profile` guarda las 24 horas del día y el `delivery_id`; la entrega es `<id>.days.parquet` (las series-días con las sumas de 06 a 21) y `<id>.cube.npz` (un zip sin comprimir de tres `.npy` con hora fija, para que los mismos días den los mismos bytes).
 
 ## D23 Validación: qué bloquea, qué se marca y qué se informa; las reglas acumuladas se leen una vez
 
