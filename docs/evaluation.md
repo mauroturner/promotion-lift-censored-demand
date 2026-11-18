@@ -1,6 +1,6 @@
 # Evaluación final independiente
 
-Qué se evaluó, quién lo evaluó, qué encontró y cómo se resolvió cada hallazgo. Es el control que el proyecto dejó para el final (plan, sección 28): lo hizo un agente que no escribió el código, sobre una copia aparte del commit `b15055c` (el código de `8585877`, U21; `b15055c` solo agrega L83), y sus cuatro bloqueantes y sus nueve advertencias se corrigieron o se dejaron dichos después. Lo que dice este documento de quién hizo qué, con qué modelo, con qué commit y con qué cifras es lo que consta en el registro del documento de seguimiento (`odd/tasks/portfolio-projects.md`, L85) y en `git log`; el detalle de cada sonda es el del informe del evaluador, que el orquestador transcribió porque la herramienta del evaluador no pudo escribir el archivo (L85), copiado aquí con las rutas del equipo quitadas. Está al día con `8b73512`, el último commit de código, con `6843245`, las salidas de la repetición del código corregido, y con el registro hasta L85.
+Qué se evaluó, quién lo evaluó, qué encontró y cómo se resolvió cada hallazgo. Es el control que el proyecto dejó para el final (plan, sección 28): lo hizo un agente que no escribió el código, sobre una copia aparte del commit `b15055c` (el código de `8585877`, U21; `b15055c` solo agrega L83), y sus cuatro bloqueantes y sus nueve advertencias se corrigieron o se dejaron dichos después; otro agente comprobó los cuatro bloqueantes sobre el commit evaluado y el corregido (L88, la sección «Comprobación»). Lo que dice este documento de quién hizo qué, con qué modelo, con qué commit y con qué cifras es lo que consta en el registro del documento de seguimiento (`odd/tasks/portfolio-projects.md`, L85 a L88) y en `git log`; el detalle de cada sonda es el del informe del evaluador, que el orquestador transcribió porque la herramienta del evaluador no pudo escribir el archivo (L85), copiado aquí con las rutas del equipo quitadas. Está al día con el registro hasta L88: las correcciones son las de L86 (el último commit de código es `8b73512`; `a5f6ebd` agrega pruebas de documentación y `6843245` versiona las salidas de la repetición del código corregido), la comprobación es la de L88 y esta sincronización no cambia código ni salidas versionadas.
 
 ## Quién evaluó y cómo
 
@@ -14,7 +14,7 @@ El núcleo numérico es correcto: cada cifra recalculada del resumen, el sello y
 
 ## Especificaciones y criterios de aceptación
 
-S1-S5, S7, S8 y S11 se cumplen; S9 en parte (las diferencias con el sitio están en `SITE-UPDATES.md`, sin aplicar, y las filas del ranking heredaban B1); S10 y S12 están en curso (faltan este documento y la página del sitio); S6 no aplica. De AC01 a AC38, todos se cumplen salvo **AC17** (B1), **AC34** (B4) y **AC37** (B3); AC18 se cumple con B2 y AC22 con las advertencias A1, A2 y A5.
+S1-S5, S7, S8 y S11 se cumplen; S9 en parte (las diferencias con el sitio están en `SITE-UPDATES.md`, sin aplicar, y las filas del ranking heredaban B1); S10 y S12 estaban en curso (faltaban este documento y la página del sitio; hoy falta solo la página del sitio); S6 no aplica. De AC01 a AC38, todos se cumplen salvo **AC17** (B1), **AC34** (B4) y **AC37** (B3); AC18 se cumple con B2 y AC22 con las advertencias A1, A2 y A5.
 
 ## Las cifras recalculadas
 
@@ -72,7 +72,7 @@ Las ubicaciones son las de `b15055c`. Cada hallazgo termina con su **Estado**.
 - **A4.** El «14,7 % empieza a las 6 h» es del entrenamiento (la distribución de la primera hora sin stock que sella el lanzamiento) y las cifras vecinas son de los 90 días. **Estado: corregida en la documentación (D50):** el README rotula el bloque.
 - **A5.** `fact_overall_effect` y `fact_band_effect` no tenían `fit_blocks`. **Estado: corregida en `8b73512` (D49).**
 - **A6.** Un rechazo en una copia nueva dejaba vacía `data/quick/interim/`. **Estado: corregida en `75456e7` (D48).**
-- **A7.** La suite tardó 139,1 s y 131,3 s, contra los 125 s de la ficha. **Estado: remedida** en el último commit de corrección (883 pruebas; 133,58 s y 135,07 s, dos corridas en reposo en `95f57f7`, dentro del límite de 180 s y del presupuesto de 150 s).
+- **A7.** La suite tardó 139,1 s y 131,3 s, contra los 125 s de la ficha. **Estado: remedida** con el código de `38a6c56`, el último commit de la carpeta antes de la sincronización final (883 pruebas recogidas; 133,58 s y 135,07 s, dos corridas en reposo del agente de las correcciones en `95f57f7`, que difiere de `38a6c56` solo en documentos; y 132,98 s y 130,73 s en las dos de la comprobación, en `38a6c56`; dentro del límite de 180 s y del presupuesto de 150 s). La sincronización final agrega una prueba de documentación, que cuesta milisegundos: la suite recoge 884 pruebas y los tiempos son los medidos con 883.
 - **A8.** Dos pruebas versionaban el nombre del usuario; la docstring de `test_real.py` decía «two tests» y son tres; el total de tiempo sumaba duraciones. **Estado: corregida en `8b73512` (D49).**
 - **A9.** `source.dataset_commit` entra en la huella y solo se valida su formato. **Estado: dejada con evidencia (D47):** lo que fija el contenido de los Parquet son sus bytes y su SHA-256, que `fetch_source` comprueba en cada corrida.
 
@@ -89,7 +89,8 @@ Las escribió un agente con Opus (plan, sección 28, ítem 2), cada una con la p
 - `8b73512` **A2, A5, A8 y las advertencias de las revisiones que tocan el código** (D49).
 - `a5f6ebd` Las pruebas de las tablas de la ficha y de la forma de todas las tablas.
 - `6843245` **Las salidas versionadas de la repetición del código corregido** (ver abajo).
-- **B3, A1, A3, A4, A7 y esta documentación** (D50), en el commit que sigue a `6843245`.
+- **B3, A1, A3, A4, A7 y esta documentación** (D50), en los commits `95f57f7` y `38a6c56`.
+- **La comprobación** (L88) no encontró ningún bloqueante nuevo y dejó una advertencia, N1 (D49 decía «veintitrés hallazgos» y son 24), y la sincronización final (plan, sección 28, ítem 4) la corrige con una nota fechada, escribe la sección «Comprobación», pone este documento entre los que comprueban las pruebas de la documentación y deja el paso a paso, las advertencias, el README, la ficha y las filas de `SITE-UPDATES.md` diciendo lo que consta en L86 a L88. No cambia código y las salidas versionadas son las que la repetición de la comprobación reprodujo (L88).
 
 **Lo que cambió en las salidas versionadas, y lo que no.** La repetición del código corregido dejó `reports/model_seal.json` igual byte a byte (SHA-256 `060428fe…6a6a` antes y después) y el artefacto del modelo igual. Comparado con lo confirmado, sin las claves de corrida, las fechas y las celdas de memoria, el contenido de 22 de los 25 Parquet es el mismo, y en los otros tres solo se agregan columnas: `overlap_group` en `fact_cell_effect` (B1), `fit_blocks` en `fact_band_effect` y `fact_overall_effect` (A5), con las demás columnas iguales; `data.json`, `validation_rules.json`, `reports/evaluation_summary.json` y el informe de validación son iguales; `algorithms.json`, `summary.json` y `operation.json` solo agregan `overlap_group`, `headline.overlap_groups` y `overlap_groups_now`; `reports/evaluation_summary.md` cambia la columna «Lo que prueba el umbral» (A2); el diseño del tablero cambia la medida y la tarjeta de los grupos indistinguibles, el número de grupo y el color de 41 celdas del gráfico de intervalos y el número de columnas de las tres tablas que ganaron una; de las nueve figuras, solo `cell_ranking.png` cambia.
 
@@ -97,8 +98,105 @@ Las escribió un agente con Opus (plan, sección 28, ítem 2), cada una con la p
 
 ## Comprobación
 
-**Pendiente.** Otro agente con Opus rehace los bloqueantes en copias del commit evaluado y del corregido, limitado a esos bloqueantes y a que las correcciones no rompan nada, con un diferencial de la línea de comandos (plan, sección 28, ítem 3). Esta sección se escribe con su resultado.
+Otro agente con Opus, que no escribió las correcciones, hizo esta comprobación en solo lectura sobre el repositorio (plan, sección 28, ítem 3). Trabajó en una carpeta de `mktemp -d` fuera de todo repositorio, con dos clones (`git clone --no-hardlinks`), uno en `b15055c` y otro en `38a6c56`. Cada uno tenía su `.venv` (Python 3.11.1, `pip install -r requirements-dev.txt`) y los dos Parquet copiados de `data/raw/`. Las sondas que escriben corrieron en copias hechas con `git archive`. «Nada escrito» quiere decir que el SHA-256 de toda la copia, nombres de carpetas incluidos, es igual antes y después.
+
+La comprobación la transcribió el orquestador, porque la herramienta del agente no pudo escribir el archivo (L88), con las rutas del equipo quitadas. La sección de arriba cuenta lo que el agente midió; lo que se hizo con sus hallazgos está en el registro (L88) y en la sincronización de este documento (plan, sección 28, ítem 4).
+
+### B1. Grupos indistinguibles
+
+- **Cálculo propio.** Un guion que solo usa `json` armó los componentes conexos del grafo de solapes (tocarse cuenta) con los intervalos de `reports/model_seal.json`.
+  - El sello es idéntico en los dos commits: `060428fe…6a6a`.
+  - Lanzamiento: 43 celdas ordenadas en 3 componentes, de 1, 33 y 9 celdas, frente a 5 grupos sellados de 1, 1, 32, 1 y 8.
+  - Prueba recuperada: 36 celdas en 1 componente, frente a 2 grupos sellados.
+  - Prueba cruda: 1 componente y 1 grupo sellado.
+  - Cada celda ordenada tiene su aumento dentro de su intervalo, así que la numeración por aumento es coherente.
+- **Reproducción del informe, en `b15055c`.** Hay 4 pares que se pisan con `tier` distinto. `algorithms.json` publica solo `tier`, también con 4 pares, y `summary.json` publica 5 grupos: falla.
+- **La misma reproducción en `38a6c56`.**
+  - El sello sigue con sus 4 pares. Es lo esperado, porque el `tier` sellado no se reescribe (D45).
+  - Sobre `overlap_group` de `algorithms.json` hay 0 pares que se pisan en grupos distintos.
+  - Las 47 celdas tienen `overlap_group` igual al cálculo propio y `tier` igual al sello.
+  - `summary.json`: `headline.overlap_groups = 3` y `tiers = 5`.
+  - `operation.json`: `overlap_groups_now` tiene 3 grupos (1, 33 y 9 celdas, que suman 43), cada uno con un solo componente propio.
+- **`fact_cell_effect`.** En los cinco alcances y versiones (lanzamiento crudo y recuperado, prueba cruda y recuperada, `valid_replication`), `overlap_group` coincide celda por celda con el cálculo propio, con 0 discrepancias. Pasa lo mismo en el modo rápido.
+- **Tablero.** La medida «Grupos indistinguibles» es `DISTINCTCOUNT(fact_cell_effect[overlap_group])` sobre el lanzamiento recuperado sellado, y el gráfico de intervalos usa `overlap_group`.
+- **Documentos.** El README, la ficha y `SITE-UPDATES.md` dicen «3 grupos, de 1, 33 y 9», «la semana de prueba (recuperado), un solo grupo» y los 5 y 2 grupos sellados. Todo coincide.
+- **Ningún aumento, intervalo, recuento de pares (183/903) ni criterio cambió.** El contenido del sello es igual.
+- **Estado: corregida.**
+
+### B2. `[effect] versions`
+
+- **En `b15055c`.** En una copia con `make-fixture data/quick --series 60` y `config/raw_only.toml` (`versions = ["raw"]`), `replay` sale con 0. `effect_estimates` tiene `raw` 118 y `recovered` 170 filas, y `daily_cell` tiene 139 y 139. Se ignora: falla.
+- **En `38a6c56`.** Se probaron siete valores, cada uno con `replay` y con `run`:
+  - `["raw"]`, `["recovered"]` y `["recovered", "raw"]` salen con 2 y un mensaje que nombra la clave y el valor aceptado.
+  - `["raw", "recovered", "raw"]` y `[]` salen con 2 por «no vacía y sin repetidos».
+  - `["raw", "bogus"]` sale con 2 por valor desconocido.
+  - `"raw"` (texto en lugar de lista) sale con 2 por «se esperaba una lista».
+  - En los 14 casos no se escribió nada.
+- **El valor aceptado `["raw", "recovered"]`** corre igual que antes (ver el modo rápido abajo).
+- **Estado: corregida.**
+
+### B3. La documentación frente al registro y al último commit
+
+- `review-advisories.md` cuenta 24 hallazgos de L74 a L84, y hay 24 bloques «Hallazgo:», incluido el de L82 (`NOT_FILTERED_MARK`). Ya no aparecen «20 en total», «todavía no consta», «hoy son 41» ni «20 hallazgos».
+- `paso-a-paso.md` nombra L70 a L85 y U01 a U21, y da U19 como no revisable (L82).
+- El README dice «40 decisiones (hoy el registro tiene 50)», y `grep -c "^## D" docs/decisions.md` da 50.
+- D44 tiene su nota fechada (B3, L85).
+- La suite recoge 883 pruebas: 882 pasadas y 1 saltada, y con `-m real_data` quedan 885 deseleccionadas. Total 893, que es 883 más 8 reales más 2 de Docker.
+- Los tiempos de la ficha (133,58 s y 135,07 s en `95f57f7`) valen para `38a6c56`: `git diff --stat 95f57f7 38a6c56` solo toca `evaluation.md` y `model-card.md`, y se midieron 132,98 s y 130,73 s.
+- `docs/evaluation.md` tenía «Comprobación» como pendiente.
+- **Estado: corregida.** Queda una advertencia (N1, abajo).
+
+### B4. RNF02 y AC34, la corrida diaria
+
+Una repetición real completa (`python -m promolift replay`) en el clon de `38a6c56`, sin otra carga en el equipo:
+
+| Corrida | Duración (de `dim_pipeline_run`) | Detalle |
+| --- | --- | --- |
+| Reloj de pared | 723 s | |
+| Lanzamiento | 318 s | load 62,0; fit_model 205,2; export 32,9 |
+| Corridas diarias | 41, 42, 43, 43, 43, 44 y 46 s | load 14,9 a 16,9 s; export 21,2 a 23,0 s |
+| Cierre | 93 s | evaluate 53,4 |
+| Corrida sin entrega (`run`) | 1 s | |
+
+- **Memoria:** 4.084,2 MB de `PeakWorkingSetSize` (`peak_working_set_mb`, contador `memory_counter = PeakWorkingSetSize`). `peak_commit_mb`, el `PeakPagefileUsage` (memoria comprometida, informativo), es de 5.802,8 MB.
+- **Prueba de tiempo:** después de la repetición, `pytest -m real_data` dio 8 pasadas, entre ellas `test_every_daily_run_takes_at_most_the_required_seconds`. En `b15055c` la evaluación había medido de 61 a 65 s.
+- **Estado: corregida.** El margen es de 14 s en la corrida más lenta.
+
+### El crítico de L84 (`docs_sync.py:44`)
+
+- En `b15055c` la fila separadora ya tiene cuatro celdas (`| --- | --- | --- | --- |`).
+- Las 28 tablas de `docs/data-dictionary.md` tienen el mismo número de celdas en el encabezado, el separador y las filas, en los dos commits.
+- No se reproduce.
+
+### Invariantes
+
+- **Modo rápido completo en los dos commits** (mismo accesorio, SHA-256 `fb2d52e6…dfff`):
+  - 22 de los 25 Parquet tienen el mismo contenido, sin las columnas de corrida.
+  - En los otros tres solo se agregan columnas: `overlap_group` en `fact_cell_effect` (B1) y `fit_blocks` en `fact_band_effect` y `fact_overall_effect` (A5). Las demás columnas son iguales fila por fila.
+  - `data.json`, `validation_rules.json`, `evaluation_summary.json` y `validation/latest.json` no cambian.
+  - El sello rápido es igual salvo dos `run_key`.
+  - `algorithms.json`, `operation.json` y `summary.json` solo agregan `overlap_group`, `overlap_groups_now` y `headline.overlap_groups`.
+  - `evaluation_summary.md` solo cambia la columna «Lo que prueba el umbral» (A2) y la clave de corrida.
+- **Diferencial de la línea de comandos.** Son 20 casos en el modo rápido, cada uno en una copia nueva de cada commit: las cinco ayudas, un comando desconocido, `make-fixture ../outside`, `--series 0`, `docs-sync` y `figures` antes de correr, `replay --until X…`, `run --only validate --from load`, `--run-key ABC`, `--only nosuchtask`, `task load`, `task recover`, `raw_only`, `--until L…` dos veces, repetir sin pendientes junto con `run` y `--until C…`, y repetir más `docs-sync` y `figures`. Se compararon la salida, los errores (normalizados por claves de corrida, rutas y tiempos), el código de salida y si la copia cambió. Las únicas diferencias son las pedidas:
+  - la ayuda de `make-fixture` (U17/S1);
+  - `raw_only` (antes 0, ahora 2 y nada escrito; B2);
+  - `task load` y `task recover` de una corrida nueva: en `b15055c` la copia cambia por la carpeta vacía `data/quick/interim/`, y en `38a6c56` queda igual (A6).
+- **La repetición real frente a lo confirmado en `38a6c56`:**
+  - Los 25 Parquet tienen el mismo contenido sin las claves de corrida, las fechas y las celdas de memoria. `dim_pipeline_run` tiene las mismas 10 filas después de `run`.
+  - Los cinco JSON del sitio, `evaluation_summary.json` y `validation/latest.json` no tienen diferencias.
+  - `reports/model_seal.json` es igual byte a byte, y el lanzamiento dio `seal=unchanged`, `artifact_sha256=a0b0aa69…` y las corridas diarias `seal=match`.
+  - El HTML del tablero es igual salvo claves de corrida y fechas.
+  - Las nueve figuras de `figures` son iguales byte a byte.
+  - `docs-sync` cambia en el README solo la clave de corrida.
+- **Suite por defecto en `38a6c56`, en reposo:** 882 pasadas, 1 saltada, 10 deseleccionadas, en 132,98 s y 130,73 s (límite 180 s, presupuesto 150 s).
+- **`-m real_data`** después de la repetición: 8 pasadas en 11,6 s.
+- `-m docker` no se corrió en la comprobación; las correcciones lo corrieron (2 pasadas en 88,25 s).
+
+### Hallazgos nuevos
+
+- **N1 (advertencia, documentación).** D49 dice que las revisiones nativas dejaron «veintitrés hallazgos». `review-advisories.md`, el registro y `docs/evaluation.md` cuentan 24, y hay 24 bloques «Hallazgo:». Reproducción: `grep -c "Hallazgo:" docs/review-advisories.md` y `grep -n "veintitrés" docs/decisions.md`.
+- Ningún bloqueante nuevo.
 
 ## Lo que queda
 
-La comprobación, la página del sitio, el `.pbix` y lo que el plan deja al dueño (sección 29), entre ellos si una versión posterior, con su propio sello, guarda los componentes como grupo sellado (D45).
+La página del sitio, el `.pbix` y lo que el plan deja al dueño (sección 29), entre ellos si una versión posterior, con su propio sello, guarda los componentes como grupo sellado (D45). Ningún bloqueante ni advertencia de esta evaluación queda abierto.

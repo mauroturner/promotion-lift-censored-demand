@@ -210,7 +210,7 @@ LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)#\s]+)(?:#[^)]*)?\)")
 IMAGE = re.compile(r"!\[[^\]]*\]\(([^)\s]+)\)")
 UNITS_DONE = [f"U{n:02d}" for n in range(1, 22)]   # U01 to U21 have their entry in the log (U20 and U21 in L83)
 STATUSES = ("corregida", "refutada", "dejada con evidencia", "abierta")
-DOCS = ("data-dictionary.md", "runbook.md", "paso-a-paso.md", "review-advisories.md", "decisions.md")   # evaluation.md joins them when the independent evaluation exists
+DOCS = ("data-dictionary.md", "runbook.md", "paso-a-paso.md", "review-advisories.md", "decisions.md", "evaluation.md")   # the independent evaluation, with its check, is in the tuple since L88
 LOCAL_PATH = re.compile(r"[A-Za-z]:[\\/]+(?:Users|Documents and Settings)|/c/Users|Users\\|/home/\w+/")
 
 
@@ -329,7 +329,7 @@ def test_every_unit_the_docs_tell_has_its_log_entry(project_root: Path, readme: 
     cited = {name: {int(n) for n in re.findall(r"\bL(\d{2,3})\b", text)} for name, text in documents.items()}
     assert [(name, sorted(numbers - set(entries))) for name, numbers in cited.items() if numbers - set(entries)] == []   # no entry that the log does not have
     assert set(UNITS_DONE) <= told["docs/paso-a-paso.md"]   # the step by step names every unit the log has
-    assert set(range(70, 86)) <= cited["docs/paso-a-paso.md"]   # and every entry of the project so far
+    assert set(range(70, 89)) <= cited["docs/paso-a-paso.md"]   # and every entry of the project so far: the evaluation (L85), the corrections and their reviews (L86, L87) and the check (L88)
 
 
 def test_the_dictionary_covers_the_source_and_its_tables_are_the_generated_ones(project_root: Path) -> None:
@@ -494,22 +494,50 @@ def advisories(text: str) -> dict[tuple[str, str], str]:
 
 
 def test_open_advisories_match_review_file(project_root: Path, readme: str) -> None:
-    """AC37 and B5 of project 03's evaluation: every advisory of every native review (L74, L76, L78, L80, L82 and L84: 24 in all) has its location and its status in
+    """AC37 and B5 of project 03's evaluation: every advisory of every native review (L74, L76, L78, L80, L82, L84 and L87: 33 in all) and N1 of the check (L88), 34 in all, has its location and its status in
     ``docs/review-advisories.md`` (corrected, with its commit; refuted or left with evidence, with the reason; or open), and the advisories the README calls open are the ones
     that file calls open. After the corrections that followed the evaluation (plan, section 28), none is open."""
     text = read(project_root, "review-advisories.md")
     found = advisories(text)
-    assert len(found) == 24 and [key for key, status in found.items() if status not in STATUSES] == []
+    assert len(found) == 34 and [key for key, status in found.items() if status not in STATUSES] == []
     blocks = [block for block in re.split(r"^(?=- \*\*)", text, flags=re.MULTILINE) if block.startswith("- **")]
     assert all(re.search(r"^  - Ubicación: .+", block, flags=re.MULTILINE) for block in blocks)   # where each one is
     fixed = [block for block in blocks if "Estado: **corregida**" in block]
-    assert len(fixed) == 13 and all(re.search(r"`[0-9a-f]{7}`", block.split("Estado: **corregida**")[1].splitlines()[0]) for block in fixed)   # each with its commit
+    assert len(fixed) == 17 and all(re.search(r"`[0-9a-f]{7}`", block.split("Estado: **corregida**")[1].splitlines()[0]) for block in fixed)   # each with its commit
     left = [block for block in blocks if re.search(r"Estado: \*\*(dejada con evidencia|refutada)\*\*\. \S", block)]
-    assert len(left) == 11, "every finding left as it is or refuted says why"
+    assert len(left) == 17, "every finding left as it is or refuted says why"
     opened = sorted(f"{key}/{ident}" for (key, ident), status in found.items() if status == "abierta")
     [stated] = re.findall(r"^Advertencias abiertas: (.+)$", readme, flags=re.MULTILINE)
     assert sorted(re.findall(r"`([^`]+)`", stated)) == opened == [] and stated == "ninguna.", stated
     assert "todavía no consta" not in text and "20 en total" not in text and "L82" in text and "lens_context_budget_exceeded" in text   # B3 of the evaluation
+
+
+STALE_PENDING = re.compile(
+    r"pendiente de la (?:evaluaci|comprobaci)|comprobaci[oó]n pendiente|comprobaci[oó]n de (?:esas |sus |las )?correcciones[^.\n]{0,80}(?:todav[ií]a no|pendiente|a[uú]n no)"
+    r"|sin la comprobaci[oó]n|escribe quien compruebe|\*\*Pendiente\.\*\*",
+    flags=re.IGNORECASE,
+)
+
+
+def test_the_evaluation_and_its_check_are_recorded_as_done_and_no_document_says_otherwise(project_root: Path, readme: str, model_card: str) -> None:
+    """Plan, section 28.4, and B4 and N1 of project 05 (RNF14): after the evaluation (L85), its corrections (L86) and the check (L88), ``docs/evaluation.md`` has the check written
+    (no section left pending), each blocker is corrected in the evaluation and again in the check, and no document or root row still says the evaluation or the check is pending.
+    N1 of the check: D49 carries a dated note that counts the review findings as the file of advisories does (24)."""
+    text = read(project_root, "evaluation.md")
+    blockers = [f"B{n}" for n in range(1, 5)]
+    for title in ("Los bloqueantes", "Comprobación"):
+        parts = {m.group(1): m.group(2) for m in re.finditer(r"^### (B\d)\. (.*?)(?=^### |\Z)", section(text, title), flags=re.MULTILINE | re.DOTALL)}
+        assert sorted(parts) == blockers, title
+        assert [b for b in blockers if not re.search(r"\*\*Estado: corregida", parts[b])] == [], title   # each blocker says it is corrected, in the evaluation and in the check
+    assert [a for a in (f"A{n}" for n in range(1, 10)) if not re.search(rf"^- \*\*{a}\.\*\*.*\*\*Estado[.:]", text, flags=re.MULTILINE)] == []   # and each advisory says its state
+    assert "Otro agente con Opus, que no escribió las correcciones" in section(text, "Comprobación") and "L88" in text
+    documents = {"README.md": readme, "docs/model-card.md": model_card, "SITE-UPDATES.md (06)": root_rows(project_root)} | {f"docs/{name}": read(project_root, name) for name in DOCS}
+    stale = [f"{name}: {match.group(0)}" for name, document in documents.items() for match in STALE_PENDING.finditer(document)]
+    assert stale == []
+    assert "no se hicieron todavía" not in read(project_root, "paso-a-paso.md").split("\n## ")[0]   # L87's warning: the introduction says what its own sections tell
+    d49 = decision(project_root, 49)
+    estado = re.search(r"^- \*\*Estado\*\*: (.+)$", d49, flags=re.MULTILINE).group(1)
+    assert re.search(r"\*\*Nota del 2026-11-18 \(comprobación, N1, L88\)\*\*: .*24 hallazgos", estado)   # N1 of the check (L88): the entry keeps its words and a dated note says the count is 24
 
 
 def test_the_root_rows_of_project_06_carry_the_real_figures(project_root: Path) -> None:
@@ -588,6 +616,7 @@ def test_every_markdown_table_has_as_many_cells_in_its_delimiter_and_its_rows_as
                 continue
             tables += 1
             width = _cells(lines[at - 1])
-            body = [row for row in (lines[at:] + [""])[: next(k for k, row in enumerate(lines[at:] + [""]) if not row.startswith("|"))]]
+            rows = lines[at:]
+            body = rows[: next((k for k, row in enumerate(rows) if not row.startswith("|")), len(rows))]   # the delimiter and the rows under it, up to the first line that is not a table row
             broken += [f"{name}:{at + 1 + k}" for k, row in enumerate(body) if _cells(row) != width]
     assert broken == [] and tables >= 40

@@ -1,6 +1,6 @@
 # Paso a paso: cómo se hizo el proyecto
 
-La cronología real, desde el registro del documento de seguimiento (`odd/tasks/portfolio-projects.md`, L70 a L85) y `git log` de esta carpeta: qué se hizo en cada paso, quién (qué agente y con qué modelo, S8), con qué prueba y en qué commit. Todo lo que dice este documento consta en el registro; una prueba comprueba que cada unidad y cada entrada del registro que nombra existe, y que cada commit que cita está en el historial (`tests/docs/test_docs.py`). La evaluación independiente y sus correcciones no se hicieron todavía y no están aquí.
+La cronología real, desde el registro del documento de seguimiento (`odd/tasks/portfolio-projects.md`, L70 a L88) y `git log` de esta carpeta: qué se hizo en cada paso, quién (qué agente y con qué modelo, S8), con qué prueba y en qué commit. Todo lo que dice este documento consta en el registro; una prueba comprueba que cada unidad y cada entrada del registro que nombra existe, y que cada commit que cita está en el historial (`tests/docs/test_docs.py`). Cuenta la construcción, las revisiones nativas, la corrida real, la documentación, la evaluación independiente (L85), sus correcciones (L86) y las revisiones de estas (L87), la comprobación de las correcciones (L88) y la sincronización final de la documentación con ese registro. Lo que falta es la página del sitio y el `.pbix`.
 
 El dueño del proyecto pidió que cuando se termina un proyecto se siga con el siguiente sin preguntar (S12), que la estructura sea la del proyecto 01 (S10), que se acepten de forma automática las revisiones de Gentle AI (S11) y los modelos de los agentes: Opus para planes, arquitectura y evaluación, Sonnet para programar y Haiku para tareas acotadas como investigar (S8).
 
@@ -75,7 +75,7 @@ U20, el README y la ficha del modelo (`4ad3f14`), y U21, el diccionario, el runb
 
 Un agente con Opus que no construyó el proyecto evaluó `b15055c` en solo lectura, en un clon aparte con su propio entorno, con un lector propio de los Parquet que no importa `promolift`. Cada cifra recalculada coincide a 10⁻⁹ o mejor, y su repetición real reprodujo el sello. Encontró cuatro bloqueantes (B1: los grupos indistinguibles separaban celdas que se pisan; B2: `[effect] versions` se ignoraba; B3: esta documentación no reflejaba L82; B4: la corrida diaria pasaba de 60 s) y nueve advertencias. Su informe está en [evaluation.md](evaluation.md).
 
-## 8. Las correcciones
+## 8. Las correcciones (L86)
 
 Un agente con Opus, con la prueba primero, una corrección de riesgo alto por commit:
 
@@ -85,8 +85,23 @@ Un agente con Opus, con la prueba primero, una corrección de riesgo alto por co
 - `75456e7` **A6** (ítem 4; D48): el bloqueo quita las carpetas vacías que creó.
 - `8b73512` **A2, A5, A8 y las advertencias de las revisiones que tocan el código** (D49).
 - `a5f6ebd` las pruebas de las tablas de la ficha y de la forma de todas las tablas de la documentación.
-- La repetición real sobre una copia, las salidas versionadas que cambian por diseño y esta documentación, en los commits que siguen.
+- `6843245` las salidas versionadas de una repetición real del código corregido, hecha sobre una copia fuera del repositorio con el sello igual byte a byte: 22 de los 25 Parquet con el mismo contenido y tres con columnas agregadas por diseño (B1 y A5), y de las nueve figuras solo cambia `cell_ranking.png`.
+- `95f57f7` y `38a6c56` (D50) B3, las advertencias de las revisiones con su estado (24 hallazgos: 13 corregidos, 10 dejados con su motivo y 1 refutado, el crítico de L84 sobre `docs_sync.py`, cuya fila separadora tiene cuatro celdas), `docs/evaluation.md` (la sección «Comprobación» quedó para el agente que comprobara las correcciones) y los tiempos de la suite medidos dos veces en reposo (133,58 s y 135,07 s).
+
+Medido: las corridas diarias de la repetición real pasaron de 61-65 s a 42-44 s, el lanzamiento tardó 310 s, el cierre 97 s y la repetición completa 717 s, con 4.112,6 MB de `PeakWorkingSetSize`; la suite por defecto, 882 pruebas pasadas y una saltada de 883 recogidas. Un diferencial de 14 casos de la línea de comandos contra `b15055c` solo difiere donde se pidió.
+
+## 9. Las revisiones nativas de las correcciones (L87)
+
+La revisión nativa de Gentle AI, con el consentimiento aceptado de forma automática (S11), revisó cada corrección de riesgo alto sola: B1 (`8585877..9c6e964`) aprobó con una sugerencia (`svg.interval_chart` ata el grupo a una variable que se llama `tier`), B2 (`9c6e964..6eb7c68`) sin hallazgos, B4 (`6eb7c68..8ef2a3e`) con una sugerencia (ninguna prueba recorre el disparador de la inserción anterior al instante) y A6 (`8ef2a3e..75456e7`) con una (`_create_in_folder` puede terminar en un `FileNotFoundError`). El resto (`75456e7..38a6c56`) superó el presupuesto de contexto y se partió en tres: las advertencias y las pruebas de la ficha (`75456e7..a5f6ebd`) se aprobaron con cuatro sugerencias; las salidas regeneradas (`a5f6ebd..6843245`) no se pudieron revisar (`lens_context_budget_exceeded`) y las revisó de otra manera la repetición de la comprobación; y la documentación (`6843245..38a6c56`) se aprobó con una advertencia (la introducción de este documento decía que la evaluación y sus correcciones «no se hicieron todavía») y una sugerencia (la tupla `DOCS` de las pruebas no incluía `evaluation.md`). Todas se aprobaron y se reconocieron; sus nueve hallazgos están en [review-advisories.md](review-advisories.md).
+
+## 10. La comprobación (L88)
+
+Otro agente con Opus, en solo lectura y sobre dos clones, uno en `b15055c` y otro en `38a6c56`, rehízo los cuatro bloqueantes: **los cuatro están corregidos**, cada uno falla en el commit evaluado y se cumple en el corregido (B1: 3 componentes en el lanzamiento y 1 en la semana de prueba, con el sello igual; B2: siete valores inválidos salen con 2 y no escriben nada; B3: 24 hallazgos, 50 decisiones, 883 pruebas y U19 dicha como no revisable; B4: una repetición real de 723 s con corridas diarias de 41 a 46 s y 4.084,2 MB de `PeakWorkingSetSize`, y las ocho pruebas con los Parquet reales pasadas). El crítico de L84 no se reproduce: las 28 tablas del diccionario están bien formadas. Un diferencial de 20 casos de la línea de comandos difiere solo por U17/S1, B2 y A6, y la repetición real reprodujo cada Parquet y cada JSON versionado, el sello, el artefacto, el tablero y las nueve figuras. La suite por defecto en `38a6c56` tardó 132,98 s y 130,73 s. No encontró ningún bloqueante nuevo y dejó una advertencia, N1: D49 decía «veintitrés hallazgos» y son 24. Su informe es la sección «Comprobación» de [evaluation.md](evaluation.md).
+
+## 11. La sincronización final (L86 a L88)
+
+El último paso, sin cambiar código ni salidas versionadas (la comprobación verificó con su repetición que no cambian): se escribió la sección «Comprobación» de [evaluation.md](evaluation.md), que entra en los documentos que comprueban las pruebas de la documentación; D49 lleva una nota fechada que corrige la cuenta de N1; la introducción de este documento y sus secciones cuentan hasta L88; las advertencias de L87 y N1 están en [review-advisories.md](review-advisories.md) con su estado; y el README, la ficha del modelo y las filas de `SITE-UPDATES.md` dicen lo que el registro tiene. El número de pruebas es el de la colección, 884: las 883 que recogía `38a6c56` más la prueba de documentación que comprueba que la evaluación y su comprobación constan como hechas; los tiempos de la suite son los medidos con las 883.
 
 ## Lo que falta
 
-La comprobación de las correcciones por otro agente con Opus, la página del sitio y el `.pbix`, que arma a mano quien tenga Power BI Desktop.
+La página del sitio, en marca-personal, y el `.pbix`, que arma a mano quien tenga Power BI Desktop. La evaluación, sus correcciones y su comprobación están hechas y ningún bloqueante ni advertencia queda abierto.

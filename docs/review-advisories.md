@@ -1,8 +1,10 @@
 # Advertencias de las revisiones nativas
 
-Cada hallazgo de las revisiones nativas de Gentle AI que el registro del documento de seguimiento anota (L74, L76, L78, L80, L82 y L84: 24 en total, entre sugerencias, advertencias y uno marcado crítico), con su ubicación y su estado después de las correcciones que siguieron a la evaluación independiente (L85). Las revisiones aprobaron todo lo que revisaron. Los hallazgos siguen el orden del registro. U19 (`6253c31`, la corrida real) no se pudo revisar: START lo rechazó con `lens_context_budget_exceeded` (9.002 líneas, casi todas salidas generadas) sin crear autoridad, y partirlo habría reescrito la historia confirmada (L82); la evaluación independiente recalculó cada cifra de esas salidas con su propio lector (L85). Una prueba (`tests/docs/test_docs.py::test_open_advisories_match_review_file`) exige que cada hallazgo tenga su ubicación y uno de los estados `corregida` (con su commit), `refutada`, `dejada con evidencia` o `abierta`, y que la lista de abiertas del README sea la de este archivo.
+Cada hallazgo de las revisiones nativas de Gentle AI que el registro del documento de seguimiento anota (L74, L76, L78, L80, L82, L84 y L87: 33 en total, entre sugerencias, advertencias y uno marcado crítico) y la advertencia nueva de la comprobación (L88, N1), 34 en total, con su ubicación y su estado después de las correcciones que siguieron a la evaluación independiente (L85, L86) y de la sincronización final (L88). Las revisiones aprobaron todo lo que revisaron; la de L84 que dejó un hallazgo crítico lo aprobó igual, y el hallazgo no se reprodujo. Los hallazgos siguen el orden del registro. U19 (`6253c31`, la corrida real) no se pudo revisar: START lo rechazó con `lens_context_budget_exceeded` (9.002 líneas, casi todas salidas generadas) sin crear autoridad, y partirlo habría reescrito la historia confirmada (L82); la evaluación independiente recalculó cada cifra de esas salidas con su propio lector (L85). Tampoco se pudo revisar `a5f6ebd..6843245`, las salidas versionadas que regeneró la repetición del código corregido (L87: START lo rechazó con `lens_context_budget_exceeded`); la comprobación las revisó de otra manera, con su propia repetición real, que reprodujo cada Parquet y cada JSON versionado, el sello, el artefacto, el tablero y las nueve figuras (L88). Una prueba (`tests/docs/test_docs.py::test_open_advisories_match_review_file`) exige que cada hallazgo tenga su ubicación y uno de los estados `corregida` (con su commit), `refutada`, `dejada con evidencia` o `abierta`, y que la lista de abiertas del README sea la de este archivo.
 
 Los hallazgos se numeran dentro de cada tramo (`S` para una sugerencia, `W` para una advertencia). Las ubicaciones son las del código al cierre de U19 (`6253c31`) para L74-L80 y las del commit revisado para L82 y L84; las que el registro no precisa dicen que se toman del registro. Cada estado `dejada con evidencia` dice por qué no se cambió.
+
+Las ubicaciones de L87 son las del código en `38a6c56` (cuando difieren de las del commit revisado, se dice). Los hallazgos de L87 que son de código quedan **dejada con evidencia**: el código es el evaluado (L85) y el comprobado (L88), son advertencias y no bloqueantes, y la sincronización final no cambia código; los que son de documentación o de las pruebas de la documentación se corrigieron en ella.
 
 ## research (L74)
 
@@ -183,3 +185,77 @@ Tramo `4ad3f14..8585877` (U21, cierre del tramo): aprobada con un hallazgo marca
   - Hallazgo: En `docs_sync.render_dictionary_tables`, el encabezado y las filas tienen cuatro celdas y la fila separadora tres (`| --- | --- | --- |`), así que GitHub no muestra como tablas las del diccionario.
   - Ubicación: `src/promolift/docs_sync.py:44` (según el registro; la fila separadora está en la línea 45).
   - Estado: **refutada**. La fila separadora que escribe el código es `| --- | --- | --- | --- |`, de cuatro celdas, en `8585877` y hoy; las 25 tablas generadas del diccionario y todas las tablas del README y de `docs/` tienen en la fila separadora y en cada fila las celdas de su encabezado. `tests/docs/test_docs.py::test_every_markdown_table_has_as_many_cells_in_its_delimiter_and_its_rows_as_in_its_header` (`a5f6ebd`) lo mantiene, y falla si una fila separadora del diccionario pierde una celda.
+
+## B1 (L87)
+
+Tramo `8585877..9c6e964` (L84-L85 y B1, escalada al ítem 1): aprobada con una sugerencia.
+
+- **S1**
+  - Hallazgo: `svg.interval_chart` sigue atando el grupo a una variable que se llama `tier`, aunque ahora recibe el grupo indistinguible (`overlap_group`) y no el grupo sellado.
+  - Ubicación: `src/promolift/dashboard/svg.py:270` y `:286` (la lista de elementos y el bucle).
+  - Estado: **dejada con evidencia**. Es solo el nombre de una variable local: no cambia ninguna salida (el gráfico de intervalos se comprobó con `overlap_group` en los cinco alcances, L88), y el código es el evaluado y el comprobado. Renombrarla sería un cambio de código sin efecto que la sincronización final no hace.
+
+## B4 (L87)
+
+Tramo `6eb7c68..8ef2a3e` (B4, escalada al ítem 1): aprobada con una sugerencia.
+
+- **S1**
+  - Hallazgo: ninguna prueba recorre el disparador que borra el registro de la preparación cuando se inserta una serie-día anterior al instante registrado.
+  - Ubicación: `sql/staging/stg_series_days_meta.sql:12` (`stg_meta_series_day_before_the_instant`).
+  - Estado: **dejada con evidencia**. Es la segunda barrera: al extender, `warehouse._rebuild` ya compara cuántas series-días anteriores al instante tiene la tabla con las que dice el registro (`src/promolift/warehouse.py:418`) y reconstruye entera si no coinciden; `tests/integration/test_load.py::test_the_staging_is_rebuilt_whole_when_the_instant_goes_back_the_partition_changes_or_a_day_appears_before_the_instant` fija el resto de los disparadores y la reconstrucción. El código es el comprobado: la repetición real de L88 dio las corridas diarias de 41 a 46 s y el contenido versionado igual.
+
+## A6 (L87)
+
+Tramo `8ef2a3e..75456e7` (A6, escalada al ítem 4): aprobada con una sugerencia.
+
+- **S1**
+  - Hallazgo: si otras liberaciones quitan la carpeta entre cada intento, `_create_in_folder` puede terminar en un `FileNotFoundError` sin atrapar.
+  - Ubicación: `src/promolift/lock.py:304` (el último `_create` después del bucle de `FOLDER_ATTEMPTS`).
+  - Estado: **dejada con evidencia**. Pide que otro proceso quite la carpeta vacía cinco veces seguidas entre el `mkdir` y la creación del archivo, y el bloqueo es de un solo escritor (D26); si ocurriera, la toma falla con un error y no escribe nada, que es el rechazo de siempre. La carrera de una vez la cierra el reintento, con su prueba (D48).
+
+## a5f6ebd (L87)
+
+Tramo `75456e7..a5f6ebd` (las advertencias de la evaluación y las pruebas de las tablas de la ficha, cierre del tramo): aprobada con cuatro sugerencias.
+
+- **S1**
+  - Hallazgo: `forecast.forecasts` necesita ahora que la vista traiga `days` (las bandas salen siempre de `view.days.bands`).
+  - Ubicación: `src/promolift/forecast.py:64`.
+  - Estado: **dejada con evidencia**. Es lo que U08/W1 pedía (D49): el 7 literal de respaldo salía de la configuración y no de la vista; la vista de la corrida trae siempre `days`, y las dos llamadas del flujo (`src/promolift/daily.py:169` y `src/promolift/launch.py:333`) le pasan la vista de la corrida.
+
+- **S2**
+  - Hallazgo: la rama de `registry._check_part` que decide por la pertenencia (`"sealed_config" in keys`) no tiene una prueba directa que la fuerce a fallar.
+  - Ubicación: `src/promolift/registry.py:459`.
+  - Estado: **dejada con evidencia**. La rama se recorre en cada lectura y escritura del sello, con la parte del lanzamiento y con la de la prueba (`registry.py:474` y `:511`), y el sello es igual byte a byte en la comprobación (L88); lo que falta es una prueba que fuerce su error, y agregarla es un cambio de código fuera de esta sincronización.
+
+- **S3**
+  - Hallazgo: el mensaje de esa rama sigue nombrando la parte del lanzamiento, aunque `_check_part` se usa también para la de la prueba.
+  - Ubicación: `src/promolift/registry.py:460`.
+  - Estado: **dejada con evidencia**. Solo la parte del lanzamiento lleva `sealed_config`, así que la rama nunca falla para la de la prueba y el mensaje es el correcto en la práctica; es el texto de un error de un sello corrupto, que ninguna corrida produce.
+
+- **S4**
+  - Hallazgo: un recorrido de las tablas difícil de leer en `test_every_markdown_table_has_as_many_cells_in_its_delimiter_and_its_rows_as_in_its_header`.
+  - Ubicación: `tests/docs/test_docs.py:582` en `a5f6ebd` (el cálculo de `body`).
+  - Estado: **corregida** en `0000000`: el cuerpo de la tabla se arma en tres líneas con nombres, con el mismo resultado.
+
+## 38a6c56 (L87)
+
+Tramo `6843245..38a6c56` (la documentación de las correcciones): aprobada con dos hallazgos. El tramo intermedio, `a5f6ebd..6843245`, no se revisó (ver arriba).
+
+- **W1**
+  - Hallazgo: `docs/paso-a-paso.md:3` dice que la evaluación independiente y sus correcciones «no se hicieron todavía» y no están ahí, contra sus propias secciones 7 y 8.
+  - Ubicación: `docs/paso-a-paso.md:3`.
+  - Estado: **corregida** en `0000000`: la introducción dice lo que las secciones cuentan (la evaluación, las correcciones, la comprobación y esta sincronización, L85 a L88) y que lo que falta es la página del sitio y el `.pbix`.
+
+- **S1**
+  - Hallazgo: la tupla `DOCS` de `tests/docs/test_docs.py` no incluye `evaluation.md`.
+  - Ubicación: `tests/docs/test_docs.py` (`DOCS`).
+  - Estado: **corregida** en `0000000`: `evaluation.md` está en la tupla y la prueba `test_the_evaluation_and_its_check_are_recorded_as_done_and_no_document_says_otherwise` exige que cada bloqueante conste como corregido en la evaluación y en la comprobación.
+
+## Comprobación (L88)
+
+La comprobación (L88) no encontró ningún bloqueante nuevo. Dejó una advertencia.
+
+- **N1**
+  - Hallazgo: D49 dice que las revisiones nativas dejaron «veintitrés hallazgos», y este archivo, el registro y `docs/evaluation.md` cuentan 24 (hasta L84).
+  - Ubicación: `docs/decisions.md` (D49, «Contexto»).
+  - Estado: **corregida** en `0000000`: D49 lleva una nota fechada que dice que son 24 (y 33 con los de L87), y una prueba la fija.
