@@ -15,7 +15,7 @@ from promolift.schema import FORBIDDEN_COLUMNS, TARGET_COLUMNS
 
 SRC = Path(__file__).resolve().parents[2] / "src" / "promolift"
 # the modules whose code decides what a method sees or issues (the leak demonstration is the one that names the field, on purpose)
-MODEL_MODULES = ("cube.py", "masks.py", "recovery.py", "effect.py", "forecast.py", "bootstrap.py", "ranking.py", "registry.py", "launch.py")
+MODEL_MODULES = ("cube.py", "masks.py", "recovery.py", "effect.py", "forecast.py", "bootstrap.py", "ranking.py", "registry.py", "launch.py", "daily.py")
 
 
 def frame(**extra) -> pd.DataFrame:
