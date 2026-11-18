@@ -149,6 +149,15 @@ def test_the_effect_facts_say_what_they_were_fitted_with_and_under_which_seal_an
     assert {(r.cell_key, r.tier) for r in ranked.itertuples()} == {(k, t) for k, _r, t in stored}, "the tier is the one stored (and sealed): it is not recomputed"
 
 
+def test_the_band_and_overall_facts_say_what_every_row_was_fitted_with(star_export):
+    """A5 (L85): the rows of the validation replication were fitted on train only, and the band and overall facts did not say it, as the cell fact does."""
+    for name in ("fact_band_effect", "fact_overall_effect"):
+        rows = read(star_export.out, name).to_pandas()
+        assert "fit_blocks" in rows.columns, name
+        assert set(rows.loc[rows["scope"] == "valid_replication", "fit_blocks"]) == {"train"} and len(rows[rows["scope"] == "valid_replication"]), name
+        assert set(rows.loc[rows["scope"] != "valid_replication", "fit_blocks"]) == {"train+purge+valid_v1+valid_v2"}, name
+
+
 def test_the_published_indistinguishable_groups_are_the_connected_components_of_the_overlap_graph_and_the_sealed_tier_is_kept(star_export):
     """B1 (L85; RF15, D45): in every scope and version, two ranked cells whose intervals overlap share an ``overlap_group``, a group is one connected run of intervals,
     the groups are numbered from the largest lift, and the ``tier`` beside it is the stored one, whatever it says."""
@@ -355,7 +364,7 @@ def _params(view, run):
     from promolift.launch import FIT_BLOCKS_VALID
     from promolift.warehouse import sql_params
 
-    params = {**sql_params(run.as_of, view), "min_series": view.ranking.min_series, "fit_blocks_valid": FIT_BLOCKS_VALID}
+    params = {**sql_params(run.as_of, view), "min_series": view.ranking.min_series, "fit_blocks_valid": FIT_BLOCKS_VALID, "fit_blocks_launch": "train+purge+valid_v1+valid_v2"}
     return {**params, "test_closed": int(params["as_of_key"] > params["test_last_key"])}
 
 

@@ -26,7 +26,7 @@ def overlap_pairs(low: np.ndarray, high: np.ndarray, ids: list[int]) -> list[tup
     return [(i, j) for i, j in combinations(ids, 2) if _overlap(low, high, i, j)]
 
 
-def overlapping_pairs(low: np.ndarray, high: np.ndarray, ids: list[int]) -> tuple[int, int]:
+def pair_counts(low: np.ndarray, high: np.ndarray, ids: list[int]) -> tuple[int, int]:
     """``(pairs, overlapping)``: how many pairs `ids` form and how many of them overlap."""
     return len(ids) * (len(ids) - 1) // 2, len(overlap_pairs(low, high, ids))
 

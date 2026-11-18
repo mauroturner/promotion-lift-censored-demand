@@ -13,7 +13,7 @@ from promolift.effect import Counterfactual, CubeView, Lifts, cell_of
 from promolift.forecast import METHODS, ForecastError, forecast_errors, forecasts
 from tests.fixtures import hand_cases as hc
 
-VIEW = SimpleNamespace(forecast=SimpleNamespace(naive_days=3))
+VIEW = SimpleNamespace(forecast=SimpleNamespace(naive_days=3), days=SimpleNamespace(bands=(0.0, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0)))
 HOURS = np.array([6, 7])
 HISTORY_KEYS = np.array([20240529, 20240530, 20240531], dtype=np.int32)
 

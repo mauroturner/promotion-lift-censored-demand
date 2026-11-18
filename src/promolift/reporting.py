@@ -30,7 +30,7 @@ from promolift.launch import FIT_BLOCKS_LAUNCH, clean, effect_row, stamp
 from promolift.leakage_demo import CHECKS_ES, NOTES_ES
 from promolift.effect import cell_key
 from promolift.registry import LaunchBundle, RunMeta, SealError, check_test_evaluation, config_fingerprint, read_seal, seal_state, sealed_document, write_test_seal
-from promolift.texts import CRITERIA, es
+from promolift.texts import CRITERIA, es, points
 from promolift.warehouse import apply_schema
 
 logger = logging.getLogger(__name__)
@@ -225,6 +225,16 @@ def _validation_lines(validation: Mapping[str, Any]) -> list[str]:
     return lines + [""]
 
 
+TESTED_BOUND = {"C01": "ci_high", "C04": "ci_low", "C08": "ci_high", "C09": "ci_high"}   # the bound of the interval of a difference each of these thresholds compares
+
+
+def threshold_figure(criterion: Mapping[str, Any]) -> str:
+    """What the threshold of a criterion compares, as the summary shows it (A2 of the evaluation, L85): the bound of the interval of the difference, in points, for the
+    criteria whose threshold is on that bound, and the value itself for the others."""
+    bound = TESTED_BOUND.get(criterion["criterion_id"])
+    return es(criterion["value"], 3) if bound is None else points(criterion.get(bound))
+
+
 def summary_markdown(summary: Mapping[str, Any]) -> str:
     """The Markdown of the summary, in Spanish: the state, each criterion with its number and its verdict (also «no supera»), and below, the post-seal analysis if there is
     one. A pending summary says why, and shows only the validation."""
@@ -235,10 +245,11 @@ def summary_markdown(summary: Mapping[str, Any]) -> str:
         lines += _validation_lines(summary.get("validation") or {})
     else:
         origin = " (tomados del sello)" if summary.get("sealed_from") == "seal" else ""
-        lines += [f"Criterios fijados antes de construir, evaluados una vez sobre la prueba{origin}.", "", "| Criterio | Umbral | Valor | Cumple | Veredicto |", "| --- | --- | ---: | --- | --- |"]
+        lines += [f"Criterios fijados antes de construir, evaluados una vez sobre la prueba{origin}.", "", "| Criterio | Umbral | Lo que prueba el umbral | Cumple | Veredicto |",
+                  "| --- | --- | ---: | --- | --- |"]
         for c in summary["criteria"]:
             passed = "informativo" if c["passed"] is None else ("sí" if c["passed"] else "no")
-            lines.append(f"| {c['criterion_id']} {_cell(c['name_es'])} | {_cell(c['threshold_es'])} | {es(c['value'], 3)} | {passed} | {_cell(c['verdict_es'])} |")
+            lines.append(f"| {c['criterion_id']} {_cell(c['name_es'])} | {_cell(c['threshold_es'])} | {threshold_figure(c)} | {passed} | {_cell(c['verdict_es'])} |")
         lines.append("")
         lines += _validation_lines(summary.get("validation") or {})
     post = summary.get("post_seal")

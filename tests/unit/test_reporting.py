@@ -78,3 +78,19 @@ def test_the_results_block_replaces_only_what_is_between_its_markers_and_a_file_
     with pytest.raises(ValueError):
         check_markers(broken, START, END)
     assert broken.read_bytes() == before
+
+
+def test_the_summary_shows_for_each_criterion_the_figure_its_threshold_tests():
+    """A2 (L85): «Valor» was the measured lift or WAPE even where the threshold tests a bound of an interval of a difference, so C08 and C09 showed the same 0,403 with
+    opposite verdicts. The column now holds the figure the threshold compares: the bound of the difference in points for C01, C04, C08 and C09, the value for the rest."""
+    figs = figures()
+    summary = summary_of(figs)
+    markdown = summary_markdown(summary)
+    assert "| Criterio | Umbral | Lo que prueba el umbral | Cumple | Veredicto |" in markdown and "| Valor |" not in markdown
+    by_id = {c["criterion_id"]: c for c in summary["criteria"]}
+    for cid, bound in (("C01", "ci_high"), ("C04", "ci_low"), ("C08", "ci_high"), ("C09", "ci_high")):
+        shown = rows_of(markdown, cid).split(" | ")[2]
+        assert shown == f"{by_id[cid][bound] * 100:.2f} puntos".replace(".", ",").replace("-", "−"), (cid, shown)
+    for cid in ("C02", "C03", "C05", "C06", "C07"):
+        assert rows_of(markdown, cid).split(" | ")[2] == f"{by_id[cid]['value']:.3f}".replace(".", ",").replace("-", "−"), cid
+    assert rows_of(markdown, "C10").split(" | ")[2] == "sin dato"

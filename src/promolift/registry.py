@@ -456,7 +456,7 @@ def _check_part(part: Mapping[str, Any], keys: tuple[str, ...] = LAUNCH_KEYS, wh
         raise SealError(f"la parte {what} debe tener exactamente las claves {list(keys)}; faltan {missing}, sobran {extra}")
     if not _is_sha256(part["config_sha256"]):
         raise SealError(f"config_sha256 de la parte {what} debe ser un SHA-256 de 64 dígitos hexadecimales")
-    if keys is LAUNCH_KEYS and canonical_sha256(part["sealed_config"]) != part["config_sha256"]:
+    if "sealed_config" in keys and canonical_sha256(part["sealed_config"]) != part["config_sha256"]:   # the part that carries its configuration (the launch's)
         raise SealError("config_sha256 no es la huella de la configuración sellada de la parte del lanzamiento")
     _rounded(dict(part))                 # refuses a value that is not JSON, or not finite, before anything is compared or written
 

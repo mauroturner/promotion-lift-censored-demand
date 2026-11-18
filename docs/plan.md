@@ -406,7 +406,7 @@ def two_way_draws(rec: Records, unit_of, n_units, resamples, seed, *, days=True)
 def interval(draws: np.ndarray) -> tuple[np.ndarray, np.ndarray]                             # percentiles 2,5 y 97,5
 def series_draws(errors_by_series, resamples, seed) -> np.ndarray                             # C01-C03
 def rank_cells(lift, low, high, series, min_series) -> pd.DataFrame                           # rank, ranked, tier
-def overlapping_pairs(low, high, ids) -> tuple[int, int]
+def pair_counts(low, high, ids) -> tuple[int, int]                                     # (pares, se pisan); antes overlapping_pairs (U08/S1)
 ```
 
 - **Dos vías** (D12): en cada remuestra, un peso por serie (`bincount` de `integers(0, S, S)`) y uno por día (`integers(0, D, D)`), y el peso de cada serie-día es el producto; el contrafactual queda fijo (no se reajusta por remuestra: el IPF de 50.000 series cambia poco y `b` ya absorbe el día). Con `days=False`, solo series (la variante). Lo medido (`p04`): el de dos vías es 1,80 veces más ancho; se pisan 157 de 903 pares en lugar de 87.

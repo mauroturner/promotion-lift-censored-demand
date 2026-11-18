@@ -1,11 +1,12 @@
 """The real files (``real_data``; not in the default suite). Until U19, no test here reads ``eval.parquet`` beyond its size, its hash and its
 schema, and none goes past the launch (D17): U04's part reads ``train.parquet`` only.
 
-U19's part (the last two tests) checks what the complete real replay left. It reads outputs and starts no run: the first evaluation of the test week is that replay itself
+U19's part (the last three tests) checks what the complete real replay left. It reads outputs and starts no run: the first evaluation of the test week is that replay itself
 (D17), made once. Without the outputs those tests fail (they do not skip) and say which file is missing."""
 
 from __future__ import annotations
 
+import getpass
 import json
 import sqlite3
 import sys
@@ -73,6 +74,7 @@ SERIES, LAUNCH_DAYS, DAILY_RUNS, SERIES_DAYS, STORES, PRODUCTS, GROUPS = 50_000,
 LAUNCH_SHARES = {"promo": 37.84, "regular": 47.69, "unflagged_cut": 14.11, "anomalous": 0.36}   # requirements.md, section 4 (train.parquet)
 MAX_PEAK_WORKING_SET_MB, MAX_TOTAL_S, MAX_LAUNCH_S, MAX_DAILY_S, MAX_PARQUET_BYTES = 12 * 1024, 20 * 60, 12 * 60, 60, 25 * 1024 * 1024   # RNF02, RNF03, AC34
 STAR_PARQUETS = 25
+USER_NAMES = {name.lower().encode() for name in (getpass.getuser(), Path.home().name) if name}   # this machine's user, read here and never written in a test (A8)
 
 
 def require(path: Path) -> Path:
@@ -146,7 +148,7 @@ def test_real_counts_seal_and_summary_consistency(cfg, outputs):
 
     # AC34 (RNF02, RNF03): times from the records of the runs; the peak of the working set with its counter named; every Parquet within its size
     assert not verify_site(Path(cfg.paths.site_dir)) and not verify_star_schema(outputs["powerbi"])
-    assert sum(seconds(r[1], r[2]) for r in runs) <= MAX_TOTAL_S, "la repetición completa con la corrida sin entrega pasa de 20 min (RNF02)"
+    assert seconds(runs[0][1], runs[-1][2]) <= MAX_TOTAL_S, "la repetición completa con la corrida sin entrega pasa de 20 min de reloj (RNF02)"   # wall clock, not a sum (A8)
     assert seconds(runs[0][1], runs[0][2]) <= MAX_LAUNCH_S, "el lanzamiento pasa de 12 min (RNF02)"
     counter = WINDOWS_COUNTER if sys.platform == "win32" else POSIX_COUNTER
     assert {r[5] for r in runs[:9]} == {counter} and max(r[4] for r in runs[:9]) <= MAX_PEAK_WORKING_SET_MB, f"el pico de {counter} pasa de 12 GB (RNF03)"
@@ -158,7 +160,7 @@ def test_real_counts_seal_and_summary_consistency(cfg, outputs):
                  outputs["seal_path"], Path(cfg.paths.dashboard_html), outputs["powerbi"] / "manifest.json"]
     for path in published:
         data = require(path).read_bytes()
-        assert b":\\Users" not in data and b"C:\\" not in data and b"/Users/" not in data and b"mauro" not in data.lower(), path.name
+        assert b":\\Users" not in data and b"C:\\" not in data and b"/Users/" not in data and not any(name in data.lower() for name in USER_NAMES), path.name
 
 
 def test_every_daily_run_takes_at_most_the_required_seconds(outputs):

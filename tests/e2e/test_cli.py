@@ -139,7 +139,7 @@ def make_fixture(project, tmp_path):
     for name, extra in (("base", ()), ("series", ("--series", "30")), ("days", ("--days", "12")), ("seed", ("--seed", "5")), ("signal", ("--signal", "null"))):
         out = tmp_path / f"fixture_{name}"
         options = {"--series": "20", "--days": "10", **dict(zip(extra[::2], extra[1::2], strict=True))}
-        ok(cli("make-fixture", str(out), *(arg for pair in options.items() for arg in pair), *(() if "--series" in options else ())))
+        ok(cli("make-fixture", str(out), *(arg for pair in options.items() for arg in pair)))
         made[name] = ((out / "train.parquet").read_bytes(), pq.read_metadata(out / "train.parquet").num_rows)
     assert made["base"][1] == 20 * 3, "--series and --days: 20 series, 3 days of training (the 7 of the test are the other file)"
     assert made["series"][1] == 30 * 3 and made["days"][1] == 20 * 5, "each of those changes the size of the files"
@@ -346,3 +346,9 @@ def test_module_entry_point_runs_from_another_directory(tmp_path):
     env = {**os.environ, "PYTHONPATH": str(PROJECT_ROOT / "src")}
     done = subprocess.run([sys.executable, "-m", "promolift", "--help"], cwd=tmp_path, env=env, capture_output=True, text=True, timeout=120)
     assert done.returncode == 0 and all(name in done.stdout for name in ("run", "replay", "task", "make-fixture", "figures", "docs-sync")), done.stderr
+
+
+def test_the_help_of_make_fixture_says_where_a_relative_folder_is_taken_from():
+    """U17/S1 of the reviews (L80): a relative ``SALIDA_DIR`` is taken from ``$PROMOLIFT_HOME`` when it is set and from the project's folder otherwise, and the help says so."""
+    fixture = next(action for action in build_parser()._subparsers._group_actions[0].choices["make-fixture"]._actions if action.dest == "output")
+    assert "$PROMOLIFT_HOME" in fixture.help and "carpeta del proyecto" in fixture.help

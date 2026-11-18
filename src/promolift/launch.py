@@ -51,7 +51,7 @@ from promolift.effect import (
 from promolift.forecast import forecast_errors, forecasts
 from promolift.leakage_demo import leakage_table, leaky_hidden_mass
 from promolift.masks import first_stockout_pmf
-from promolift.ranking import overlapping_pairs, rank_cells, spearman
+from promolift.ranking import pair_counts, rank_cells, spearman
 from promolift.recovery import (
     MaskedBlock,
     Recovery,
@@ -387,7 +387,7 @@ def _launch(cfg: Any, conn: sqlite3.Connection, run: RunMeta, view: Any, extras:
 
     # --- the documents, the rows and the rules ---
     ranked_ids = [int(i) for i in np.flatnonzero(estimates["recovered"]["ranking"]["ranked"].to_numpy())]
-    pair_count, overlap_count = overlapping_pairs(estimates["recovered"]["cell"]["low"], estimates["recovered"]["cell"]["high"], ranked_ids)
+    pair_count, overlap_count = pair_counts(estimates["recovered"]["cell"]["low"], estimates["recovered"]["cell"]["high"], ranked_ids)
 
     def entry(family: str, version: str, key: str, at: int) -> dict[str, Any]:
         s = estimates[version][family]

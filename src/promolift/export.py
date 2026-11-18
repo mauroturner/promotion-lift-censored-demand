@@ -31,7 +31,7 @@ from promolift.dashboard.semantic_model import SemanticModel, Table, arrow_schem
 from promolift.deliveries import delivery_plan
 from promolift.files import write_atomic
 from promolift.forecast import METHODS as FORECAST_METHODS
-from promolift.launch import FIT_BLOCKS_VALID, launch_keys
+from promolift.launch import FIT_BLOCKS_LAUNCH, FIT_BLOCKS_VALID, launch_keys
 from promolift.ranking import overlap_groups
 from promolift.registry import MODEL_VERSION, RunMeta, read_registry, read_seal
 from promolift.warehouse import SQL_DIR, _fail_on, apply_schema, rebuild_marts, run_checks, run_sql_file, sql_params, stage_series_days
@@ -144,7 +144,8 @@ def build_powerbi_marts(conn: sqlite3.Connection, run: RunMeta, view: Any, *, se
     """Rebuild the staging, the reference tables and the star model as of ``run.as_of`` and run its controls in one transaction; a control with rows undoes it all
     (``CheckFailedError``) and the marts keep what they had."""
     apply_schema(conn)
-    params = {**sql_params(run.as_of, view), "min_series": int(view.ranking.min_series), "fit_blocks_valid": FIT_BLOCKS_VALID}
+    params = {**sql_params(run.as_of, view), "min_series": int(view.ranking.min_series), "fit_blocks_valid": FIT_BLOCKS_VALID,
+              "fit_blocks_launch": FIT_BLOCKS_LAUNCH}
     params["test_closed"] = int(params["as_of_key"] > params["test_last_key"])
     conn.execute("BEGIN IMMEDIATE")
     try:

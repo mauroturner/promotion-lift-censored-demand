@@ -31,7 +31,7 @@ from promolift.days import PROMO, REGULAR
 from promolift.effect import CubeView, Records, cell_key, cell_of, day_factor, records, regular_mask
 from promolift.forecast import forecast_errors
 from promolift.launch import FIT_BLOCKS_LAUNCH, clean, launch_keys, unit_stats
-from promolift.ranking import overlapping_pairs, rank_cells, spearman
+from promolift.ranking import pair_counts, rank_cells, spearman
 from promolift.recovery import MaskedBlock, candidate_name, recover_block, score_candidates
 from promolift.registry import LaunchBundle, SealError, sealed_document
 from promolift.schema import date_key
@@ -219,7 +219,7 @@ def _median_width(stats: Mapping[str, np.ndarray], ranked: list[int]) -> float |
 def pairs_of(stats: Mapping[str, np.ndarray], ranking: pd.DataFrame) -> dict[str, Any]:
     """The ranked cells, the pairs they form, how many overlap and the median width of their intervals."""
     ranked = [int(i) for i in np.flatnonzero(ranking["ranked"].to_numpy())]
-    pairs, overlapping = overlapping_pairs(stats["low"], stats["high"], ranked)
+    pairs, overlapping = pair_counts(stats["low"], stats["high"], ranked)
     return {"cells": len(ranked), "pairs": pairs, "overlapping": overlapping, "median_width": _median_width(stats, ranked)}
 
 

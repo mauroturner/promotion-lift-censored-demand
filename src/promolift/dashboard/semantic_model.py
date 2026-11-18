@@ -163,14 +163,14 @@ FACT_CELL_EFFECT = Table("fact_cell_effect", "fact", ("scope", "version_key", "c
 ), "El aumento de cada celda por alcance y versión, con su intervalo y su lugar en el ranking.")
 FACT_BAND_EFFECT = Table("fact_band_effect", "fact", ("scope", "version_key", "band_key", "control", "day_state", "seal_state"), (
     SCOPE_EFFECT, VERSION_KEY, BAND_KEY, _c("control", "string", "Días de control: regular (sin marca y sin rebaja) o any_flag0 (cualquier día sin marca)."), LIFT, CI_LOW, CI_HIGH,
-    SERIES, SERIES_DAYS, _c("day_state", "string", "Días medidos: promo, o unflagged_cut (rebaja sin marca: su propio efecto)."), SEAL_STATE,
+    SERIES, SERIES_DAYS, _c("day_state", "string", "Días medidos: promo, o unflagged_cut (rebaja sin marca: su propio efecto)."), FIT_BLOCKS, SEAL_STATE,
 ), "El aumento de cada banda de descuento, y el de los días con rebaja sin marca.")
 FACT_GROUP_EFFECT = Table("fact_group_effect", "fact", ("scope", "version_key", "group_key", "seal_state"), (
     SCOPE_EFFECT, VERSION_KEY, GROUP_KEY, LIFT, CI_LOW, CI_HIGH, SERIES, SEAL_STATE,
 ), "El aumento de cada grupo de gestión.")
 FACT_OVERALL_EFFECT = Table("fact_overall_effect", "fact", ("scope", "version_key", "estimator", "control", "seal_state"), (
     SCOPE_EFFECT, VERSION_KEY, _c("estimator", "string", "naive_pooled (la cuenta que mezcla productos) o counterfactual (la misma serie y la misma hora)."),
-    _c("control", "string", "Días de control: regular o any_flag0."), LIFT, CI_LOW, CI_HIGH, SERIES_DAYS, SEAL_STATE,
+    _c("control", "string", "Días de control: regular o any_flag0."), LIFT, CI_LOW, CI_HIGH, SERIES_DAYS, FIT_BLOCKS, SEAL_STATE,
 ), "El aumento total, con la cuenta ingenua al lado del contrafactual.")
 FACT_DAILY_CELL = Table("fact_daily_cell", "fact", ("date_key", "version_key", "cell_key"), (
     DATE_KEY, VERSION_KEY, CELL_KEY, _c("observed", "float64", "Suma de la venta observada de las series-días con promoción de la celda ese día."),

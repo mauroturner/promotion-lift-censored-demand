@@ -61,7 +61,7 @@ def forecasts(cf: Counterfactual, b_day: np.ndarray, lifts: Lifts, inputs: DayIn
     series = inputs.series_key[usable].astype(np.intp)
     day_cf = Counterfactual(cf.a, np.asarray(b_day)[:, None], np.array([inputs.date_key], dtype=np.int32), cf.version, cf.group_ids)
     f0 = counterfactual(day_cf, group, series, np.zeros(len(usable), dtype=np.intp), in_stock)
-    cell = cell_of(group[usable], inputs.band[usable], len(view.days.bands) - 1) if hasattr(view, "days") else cell_of(group[usable], inputs.band[usable], 7)
+    cell = cell_of(group[usable], inputs.band[usable], len(view.days.bands) - 1)
     cell_lift = np.where(cell >= 0, lifts.cell[np.maximum(cell, 0)], np.nan)
     f1 = np.where(in_stock, history.values[series].mean(axis=1, dtype=np.float64), 0.0).sum(axis=1)
     observed = np.where(in_stock, inputs.sales[usable], 0.0).sum(axis=1, dtype=np.float64)

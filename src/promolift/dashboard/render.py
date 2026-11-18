@@ -23,7 +23,7 @@ import pyarrow.parquet as pq
 
 from promolift.cube import ATTRIBUTION
 from promolift.dashboard import svg
-from promolift.dashboard.semantic_model import PAGE_COLUMNS, PAGE_ROWS, Page, SemanticModel, Visual, dax_measure_refs, validate_model
+from promolift.dashboard.semantic_model import NOT_FILTERED, PAGE_COLUMNS, PAGE_ROWS, Page, SemanticModel, Visual, dax_measure_refs, validate_model
 from promolift.files import write_atomic
 from promolift.registry import RunMeta
 
@@ -352,7 +352,7 @@ def _runs(data: _Data) -> str:
                        [[r.run_key, r.delivery_id or DASH, _when(r.as_of), r.status, _int(r.rows_issued), r.message or ""] for r in runs.head(TABLE_ROWS).itertuples()], {4})
 
 
-NOT_FILTERED_MARK = " (no lo"
+NOT_FILTERED_MARK = NOT_FILTERED[:NOT_FILTERED.index("{")]   # " (no lo filtra": what every note starts with, before its fields
 
 
 def _bare_title(title: str) -> str:

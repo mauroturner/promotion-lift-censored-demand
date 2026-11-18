@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from promolift.ranking import overlap_groups, overlap_pairs, overlapping_pairs, rank_cells
+from promolift.ranking import overlap_groups, overlap_pairs, pair_counts, rank_cells
 from tests.fixtures import hand_cases as hc
 
 
@@ -25,8 +25,8 @@ def test_the_pairs_that_overlap_are_counted_exactly_and_touching_intervals_overl
     lift, low, high, names = arrays()
     pairs = overlap_pairs(low, high, list(range(5)))
     assert {(names[i], names[j]) for i, j in pairs} == hc.TIERS_EXPECTED["overlapping_pairs"]
-    assert overlapping_pairs(low, high, list(range(5))) == (hc.TIERS_EXPECTED["pairs"], len(hc.TIERS_EXPECTED["overlapping_pairs"]))
-    assert overlapping_pairs(low, high, [0, 1]) == (1, 1) and overlapping_pairs(low, high, [0]) == (0, 0)
+    assert pair_counts(low, high, list(range(5))) == (hc.TIERS_EXPECTED["pairs"], len(hc.TIERS_EXPECTED["overlapping_pairs"]))
+    assert pair_counts(low, high, [0, 1]) == (1, 1) and pair_counts(low, high, [0]) == (0, 0)
 
 
 def test_a_tier_is_not_a_chain_by_the_first_cell_only_a_cell_that_overlaps_no_one_of_the_open_group_starts_another():

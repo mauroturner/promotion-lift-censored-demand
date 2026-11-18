@@ -291,4 +291,4 @@ def read_delivery(out_dir: Path, entry: ManifestEntry) -> tuple[pd.DataFrame, tu
 
 
 __all__ = ["DAYS_COLUMNS", "DAYS_SCHEMA", "MANIFEST_NAME", "DeliverySpec", "ManifestEntry", "delivery_digest", "delivery_plan", "delivery_sums",
-           "mark_delivery", "next_pending", "publish", "read_delivery", "read_manifest", "sha256_file"]
+           "mark_delivery", "next_pending", "publish", "read_delivery", "read_manifest"]

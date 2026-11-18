@@ -15,6 +15,7 @@ carry the real verdicts.
 from __future__ import annotations
 
 import ast
+import getpass
 import json
 import re
 import shutil
@@ -26,6 +27,8 @@ import pytest
 from promolift.reporting import RESULTS_END, RESULTS_START
 
 README_TITLE = "# Qué promociones venden de verdad"
+USER_NAMES = {name.lower() for name in (getpass.getuser(), Path.home().name) if name}   # this machine's user, read here and never written in a test (A8)
+EMAIL = re.compile(r"\S+@\S+")                                                         # a public contact address may carry a name: it is not a local path
 README_HEADINGS = [   # plan, section 25, in this order (AC37)
     "El problema", "La solución", "Los resultados", "En qué consiste", "Los datos", "Los algoritmos", "El producto", "La documentación",
     "Con IA, de punta a punta", "Para qué sirve", "Cómo correrlo de punta a punta", "Paso a paso", "Fuente y licencia",
@@ -117,7 +120,7 @@ def test_the_readme_says_what_is_pending_and_gives_the_attribution(readme: str, 
     ):
         assert piece in tail, piece
     for document in (readme, model_card):
-        assert not re.search(r"[A-Za-z]:[\\/]+(Users|Documents and Settings)", document) and "mauro" not in document.lower() and "@gmail" not in document
+        assert not re.search(r"[A-Za-z]:[\\/]+(Users|Documents and Settings)", document) and not any(name in EMAIL.sub("", document).lower() for name in USER_NAMES) and "@gmail" not in document
 
 
 # --- the intervals the documents quote (AC37, RNF14; lessons B3 of project 05) ------------------------------------------------------------------------------------------
@@ -529,5 +532,11 @@ def test_no_document_publishes_a_local_path_or_a_user_name(project_root: Path, r
     """The README, every document of ``docs/`` and the root rows name no path of the machine and no user name."""
     documents = {"README.md": readme, "SITE-UPDATES.md (06)": root_rows(project_root)}
     documents |= {f"docs/{path.name}": path.read_text(encoding="utf-8") for path in sorted((project_root / "docs").glob("*.md"))}
-    found = [name for name, text in documents.items() if LOCAL_PATH.search(text) or re.search(r"mauro", text.replace("hola@mauroturner.com", ""), flags=re.IGNORECASE)]
+    found = [name for name, text in documents.items() if LOCAL_PATH.search(text) or any(name in EMAIL.sub("", text).lower() for name in USER_NAMES)]
     assert found == []
+
+
+def test_no_test_and_no_source_file_carries_this_machine_s_user_name(project_root: Path) -> None:
+    """A8 (L85): two tests wrote the user's name as a literal to check that nothing published carries it; they read it from the machine now, and no versioned code does."""
+    texts = {path.relative_to(project_root).as_posix(): path.read_text(encoding="utf-8") for folder in ("tests", "src") for path in sorted((project_root / folder).rglob("*.py"))}
+    assert [name for name, text in texts.items() if any(user in EMAIL.sub("", text).lower() for user in USER_NAMES)] == []

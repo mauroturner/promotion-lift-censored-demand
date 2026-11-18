@@ -98,3 +98,14 @@ def test_every_maker_key_is_the_bare_title_of_a_visual_and_every_visual_has_a_ma
     visuals = [v for page in PAGES for v in page.visuals if v.kind not in ("slicer", "card")]
     keys = set(_makers(data, visuals[0]))
     assert keys == {v.title_es.split(" (no lo")[0] for v in visuals}
+
+
+def test_the_mark_that_cuts_the_not_filtered_note_is_derived_from_the_note_itself():
+    """L82's suggestion: ``NOT_FILTERED_MARK`` was the partial literal ``' (no lo'``; it is now the part of ``semantic_model.NOT_FILTERED`` before its first field, so a
+    change of the note cannot leave the previews keyed by a stale prefix."""
+    from promolift.dashboard import render
+    from promolift.dashboard.semantic_model import NOT_FILTERED
+
+    assert render.NOT_FILTERED_MARK == NOT_FILTERED[:NOT_FILTERED.index("{")] == " (no lo filtra"
+    for title in ("Aumento total recuperado" + NOT_FILTERED.format(plural="", names="el grupo"), "Pérdida" + NOT_FILTERED.format(plural="n", names="la fecha y el grupo")):
+        assert render._bare_title(title) == title.split(" (no lo")[0]

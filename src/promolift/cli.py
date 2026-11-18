@@ -70,7 +70,7 @@ def build_parser(task_ids: tuple[str, ...] | None = None) -> argparse.ArgumentPa
     task.add_argument("--run-key", metavar="CLAVE", help="la corrida a la que pertenece (una nueva si se omite; una tarea desde load necesita la de una corrida que tiene su entrega: sin ella sale con 2)")
 
     fixture = commands.add_parser("make-fixture", help="escribe los dos Parquet sintéticos (train y eval) para las pruebas y el modo rápido")
-    fixture.add_argument("output", type=Path, metavar="SALIDA_DIR", help="la carpeta donde se escriben; una ruta relativa se toma desde la carpeta del proyecto")
+    fixture.add_argument("output", type=Path, metavar="SALIDA_DIR", help="la carpeta donde se escriben; una ruta relativa se toma desde $PROMOLIFT_HOME o, sin él, desde la carpeta del proyecto")
     fixture.add_argument("--series", type=int, default=300, help="series (por defecto 300; la configuración rápida espera 300)")
     fixture.add_argument("--seed", type=int, default=0, help="semilla de la simulación (por defecto 0)")
     fixture.add_argument("--signal", choices=SIGNALS, default="lift", help="lift: el aumento plantado por banda y grupo (control positivo); null: ninguno (control negativo)")

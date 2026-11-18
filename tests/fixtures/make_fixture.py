@@ -183,7 +183,7 @@ def _series_table(series: int) -> pd.DataFrame:
     return pd.DataFrame(rows[:series]).sort_values(["store_id", "product_id"]).reset_index(drop=True)
 
 
-def _draw_states(rng: np.random.Generator, n_series: int, n_days: int, group: np.ndarray):
+def _draw_states(rng: np.random.Generator, n_series: int, n_days: int):
     """Day states, bands, flags and discounts, and the series that carry a planted pattern."""
     S, D = n_series, n_days
     p = rng.beta(1.0, 1.6, S)                                   # the share of promoted days of each series
@@ -322,7 +322,7 @@ def make_fixture(out_dir: Path, series: int = 300, seed: int = 0, signal: str = 
     weekend = np.array([d.weekday() >= 5 and d not in WORKING_DAYS for d in dates])
     holiday = (weekend | np.array([d in HOLIDAYS for d in dates])).astype(np.int8)
     level = np.where(holiday == 1, WEEKEND_FACTOR, 1.0)[None, :] * np.exp(0.08 * rng.standard_normal((N_GROUPS, D)))       # (group, day)
-    state, band, flag, discount, zero_series, no_regular = _draw_states(rng, S, D, group)
+    state, band, flag, discount, zero_series, no_regular = _draw_states(rng, S, D)
 
     lift_cell = np.zeros((N_GROUPS, len(LIFT_BY_BAND)))
     unflagged_lift = 0.0

@@ -224,6 +224,7 @@ Hecho. El aumento de cada banda de descuento, y el de los días con rebaja sin m
 | `series` | entero 32 | series | Series (tienda por producto) con series-días en la unidad. |
 | `series_days` | entero 32 | series-días | Series-días en la unidad. |
 | `day_state` | texto | — | Días medidos: promo, o unflagged_cut (rebaja sin marca: su propio efecto). |
+| `fit_blocks` | texto | — | Con qué bloques se ajustó el método que dio la cifra (train, o el período del lanzamiento): nada se mide como fuera de muestra con su propio bloque. |
 | `seal_state` | texto | — | sealed (la configuración sellada) o post_seal (otra, posterior al sello). |
 
 ### `fact_group_effect`
@@ -255,6 +256,7 @@ Hecho. El aumento total, con la cuenta ingenua al lado del contrafactual. Se ver
 | `ci_low` | decimal | fracción | Límite inferior del intervalo del 95 %. |
 | `ci_high` | decimal | fracción | Límite superior del intervalo del 95 %. |
 | `series_days` | entero 32 | series-días | Series-días en la unidad. |
+| `fit_blocks` | texto | — | Con qué bloques se ajustó el método que dio la cifra (train, o el período del lanzamiento): nada se mide como fuera de muestra con su propio bloque. |
 | `seal_state` | texto | — | sealed (la configuración sellada) o post_seal (otra, posterior al sello). |
 
 ### `fact_daily_cell`

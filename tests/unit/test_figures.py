@@ -66,3 +66,12 @@ def test_before_the_seal_the_figures_say_they_show_the_validation_and_not_the_te
     assert data["forecast_wape"]["scope"] == "valid" and data["forecast_wape"]["fit_blocks"] == ["train"] and data["recovery_check"]["scope"] == "valid_v2" and data["recovery_check"]["fit_blocks"] == ["train"]
     assert data["replication"]["cell"] == [] and all(isinstance(figures._DRAW[name](data[name]), bytes) for name in FIGURES)        # an empty figure is drawn, saying why
     assert len(read_site(site_files.out).operation["replication"]) > 0
+
+
+def test_a_recovery_row_without_its_blocks_is_left_out_of_the_title_instead_of_breaking_it(site_files):
+    """U14/S1 of the reviews (L78): ``fit_blocks`` were sorted and joined without leaving out a missing one, so one ``None`` stopped the figure."""
+    site = site_files.site
+    recovery = [{**r, "fit_blocks": None} if i == 0 else r for i, r in enumerate(r for r in site.algorithms["recovery"])]
+    data = figure_data(dataclasses.replace(site, algorithms={**site.algorithms, "recovery": recovery}))
+    assert None not in data["recovery_check"]["fit_blocks"] and isinstance(figures._DRAW["recovery_check"](data["recovery_check"]), bytes)
+    assert all(isinstance(v, float) for key in ("recovered", "ci_low", "ci_high") for v in data["cell_ranking"][key]), "U14/S2: the ranking's series pass through _none too"
