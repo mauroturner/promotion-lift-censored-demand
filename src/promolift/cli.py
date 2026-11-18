@@ -1,7 +1,7 @@
 """Command line of the pipeline: ``python -m promolift <command>`` (RF23, AC28, AC30, AC31; plan, section 22; D25, D27). Adapted from project 05's ``cli.py``.
 
 ``run``, ``task`` and ``replay`` call ``pipeline.run_all``, ``pipeline.run_task`` and ``pipeline.replay``: the same task list, order and functions as the Airflow DAG, so the whole
-flow runs on Windows without Airflow. ``figures`` calls ``figures.write_figures`` and ``docs-sync`` calls ``reporting.replace_block``: no step is written here.
+flow runs on Windows without Airflow. ``figures`` calls ``figures.write_figures`` and ``docs-sync`` calls ``reporting.replace_block`` and ``docs_sync.render_dictionary_tables``: no step is written here.
 
 Exit codes: 0 ok (also a run with no delivery left and a replay with nothing pending), 1 a task failed, 2 wrong usage or configuration (also a task refused by the state of its run
 or because another writer holds the data folder), 3 the delivery or the source was rejected by the validation. A combination that cannot do what it says is refused with 2 before
@@ -77,9 +77,10 @@ def build_parser(task_ids: tuple[str, ...] | None = None) -> argparse.ArgumentPa
     fixture.add_argument("--days", type=int, default=97, help="días del calendario, los 7 últimos de la prueba (por defecto 97, el del conjunto real)")
 
     commands.add_parser("figures", parents=[common], help="dibuja las nueve figuras de la documentación desde los archivos del sitio verificados de la última corrida")
-    docs_sync = "copia el resumen de resultados (reports/" + SUMMARY_MD + ") en el bloque de resultados del README"
+    docs_sync = ("copia el resumen de resultados (reports/" + SUMMARY_MD + ") en el bloque de resultados del README y escribe, desde el modelo semántico, las tablas de cada "
+                 "Parquet en el diccionario de datos (docs/data-dictionary.md) si existe junto a la carpeta de figuras")
     commands.add_parser("docs-sync", parents=[common], help=docs_sync,
-                        description=docs_sync[0].upper() + docs_sync[1:] + ". Un segundo uso no cambia nada; si el README no tiene sus dos marcadores no se escribe nada.")
+                        description=docs_sync[0].upper() + docs_sync[1:] + ". Un segundo uso no cambia nada; si un archivo no tiene sus dos marcadores no se escribe ninguno.")
     return parser
 
 
@@ -168,8 +169,12 @@ def _make_fixture(args: argparse.Namespace) -> int:
 
 
 def _docs_sync(cfg) -> int:
-    """The results block of the README from the summary. Check everything, then write: the file is read once and its markers are checked before it is written, so a README without
-    its two markers is left as it was (exit 2)."""
+    """The results block of the README from the summary and, when ``docs/data-dictionary.md`` is next to the figures folder, its generated tables from the semantic model.
+
+    Check everything, then write: each file is read once, its markers are checked and its new text is computed (the dictionary's tables rendered) before any file is written, so a
+    file without its markers or a column type the dictionary cannot name leaves every file as it was (exit 2)."""
+    from promolift.dashboard.semantic_model import MODEL
+    from promolift.docs_sync import COLUMNS_END, COLUMNS_START, dictionary_path, render_dictionary_tables
     from promolift.files import write_atomic
     from promolift.reporting import RESULTS_END, RESULTS_START, replace_block
 
@@ -178,14 +183,22 @@ def _docs_sync(cfg) -> int:
         raise _UsageError(f"la configuración no tiene un README que sincronizar: {readme} no existe (el modo rápido no lo tiene). {NOTHING_WRITTEN}")
     if not summary.is_file():
         raise _UsageError(f"falta el resumen de resultados {summary}: lo escribe la tarea report. {NOTHING_WRITTEN}")
-    text = readme.read_text(encoding="utf-8")
+    dictionary = dictionary_path(Path(cfg.paths.figures_dir))
+    blocks = [(readme, RESULTS_START, RESULTS_END, lambda: summary.read_text(encoding="utf-8"))]
+    if dictionary.is_file():
+        blocks.append((dictionary, COLUMNS_START, COLUMNS_END, lambda: render_dictionary_tables(MODEL)))
+    planned: list[tuple[Path, str, str]] = []   # (file, its text as read, its new text)
     try:
-        new = replace_block(text, readme.name, RESULTS_START, RESULTS_END, summary.read_text(encoding="utf-8"))
-    except ValueError as error:   # a file without its two markers, once each and in order: nothing was written
+        for path, start, end, content in blocks:
+            text = path.read_text(encoding="utf-8")
+            planned.append((path, text, replace_block(text, path.name, start, end, content())))
+    except ValueError as error:   # a file without its two markers, once each and in order, or a type the dictionary cannot name: nothing was written
         raise _UsageError(f"{error}. {NOTHING_WRITTEN}") from error
-    if new != text:
-        write_atomic(readme, new)
-    _say(f"{readme.name} actualizado" if new != text else f"{readme.name} ya estaba al día")
+    for path, text, new in planned:
+        if new != text:
+            write_atomic(path, new)
+    for path, text, new in planned:
+        _say(f"{path.name} actualizado" if new != text else f"{path.name} ya estaba al día")
     return EXIT_OK
 
 
