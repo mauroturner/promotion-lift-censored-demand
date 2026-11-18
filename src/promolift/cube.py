@@ -8,8 +8,10 @@ last: a set of files without its manifest, or a file that is not the one the man
 
 from __future__ import annotations
 
+import io
 import json
 import re
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +19,7 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from promolift.files import atomic_path, sha256_file
+from promolift.files import atomic_path, sha256_file, write_atomic
 
 INTERIM_MANIFEST = "interim_manifest.json"
 INTERIM_MANIFEST_VERSION = 1
@@ -130,3 +132,46 @@ def open_cube(interim_dir: Path) -> Cube:
         raise InterimError(problem)
     keys = sorted({int(match.group(1)) for name in document["files"] if (match := _TENSOR.fullmatch(name))})
     return Cube(Path(interim_dir), np.array(keys, dtype=np.int32), int(document["counts"]["series"]))
+
+
+# --- the cube of one delivery ---------------------------------------------------------------------------------------------------
+
+
+def delivery_cube_bytes(date_keys: np.ndarray, sales: np.ndarray, stock: np.ndarray) -> bytes:
+    """The bytes of a delivery's cube: ``date_keys`` (int32, days), ``sales`` (float32, series x days x 24) and ``stock`` (int8, same shape) as an
+    uncompressed zip of three ``.npy`` with a fixed entry time, so the same hours always give the same bytes (publishing again changes nothing, D18)."""
+    arrays = {"date_keys": np.ascontiguousarray(date_keys, dtype=np.int32), "sales": np.ascontiguousarray(sales, dtype=DTYPES["sales"]),
+              "stock": np.ascontiguousarray(stock, dtype=DTYPES["stock"])}
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_STORED) as archive:
+        for name, array in arrays.items():
+            payload = io.BytesIO()
+            np.lib.format.write_array(payload, array, allow_pickle=False)
+            info = zipfile.ZipInfo(f"{name}.npy", date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_STORED
+            archive.writestr(info, payload.getvalue())
+    return buffer.getvalue()
+
+
+def write_delivery_cube(path: Path, date_keys: np.ndarray, sales: np.ndarray, stock: np.ndarray) -> str:
+    """Write the cube of one delivery (``delivery_cube_bytes``) as ``<delivery_id>.cube.npz`` atomically and return its SHA-256; it is read back with
+    ``read_delivery_cube`` (``np.load(allow_pickle=False)``)."""
+    write_atomic(Path(path), delivery_cube_bytes(date_keys, sales, stock))
+    return sha256_file(Path(path))
+
+
+def read_delivery_cube(path: Path) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """``(date_keys, sales, stock)`` of a delivery's cube; ``InterimError`` if it is not three arrays of the right type and shape, and a file with
+    Python objects is refused (``allow_pickle=False``)."""
+    with np.load(Path(path), allow_pickle=False) as archive:
+        if set(archive.files) != {"date_keys", "sales", "stock"}:
+            raise InterimError(f"{Path(path).name} no tiene los tres arreglos de una entrega (date_keys, sales, stock): tiene {sorted(archive.files)}")
+        date_keys, sales, stock = archive["date_keys"], archive["sales"], archive["stock"]
+    if date_keys.dtype != np.int32 or date_keys.ndim != 1:
+        raise InterimError(f"{Path(path).name}: date_keys debe ser un arreglo int32 de una dimensión")
+    for name, array in (("sales", sales), ("stock", stock)):
+        if array.dtype != DTYPES[name] or array.ndim != 3 or array.shape[1] != len(date_keys) or array.shape[2] != 24:
+            raise InterimError(f"{Path(path).name}: {name} debe ser {DTYPES[name]} de forma (series, {len(date_keys)}, 24), tiene {array.dtype} {array.shape}")
+    if sales.shape != stock.shape:
+        raise InterimError(f"{Path(path).name}: sales y stock no tienen la misma forma")
+    return date_keys, sales, stock

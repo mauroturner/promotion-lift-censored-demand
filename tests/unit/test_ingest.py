@@ -29,26 +29,11 @@ from promolift.ingest import (
     write_source_lock,
 )
 from promolift.schema import FORBIDDEN_COLUMNS, SourceError
-from tests.fixtures.make_fixture import STATE_NAMES, UNFLAGGED, make_fixture, write_parquet
+from tests.fixtures.make_fixture import STATE_NAMES, UNFLAGGED, damaged_pair, make_fixture, replace_column
 
 
 def sha(path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
-
-
-def damaged_pair(truth, folder, change, which="train"):
-    """A copy of the fixture's two files in `folder` where `change(table)` is applied to `which`."""
-    folder.mkdir(parents=True, exist_ok=True)
-    for name, path in (("train", truth.train_path), ("eval", truth.eval_path)):
-        if name == which:
-            write_parquet(change(pq.read_table(path)), folder / f"{name}.parquet")
-        else:
-            (folder / f"{name}.parquet").write_bytes(path.read_bytes())
-    return folder
-
-
-def replace_column(table: pa.Table, name: str, values: pa.Array) -> pa.Table:
-    return table.set_column(table.schema.get_field_index(name), table.schema.field(name), values)
 
 
 # --- V01, V03: the pinned files ------------------------------------------------------------------------------------------------

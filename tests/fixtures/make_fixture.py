@@ -442,3 +442,23 @@ def make_malformed(base: FixtureTruth, kind: str, out_dir: Path) -> Malformed:
     write_parquet(_damage(table, kind), out_dir / "train.parquet")
     hash_from = base.dir if kind == "wrong_hash" else None
     return Malformed(out_dir, "train", kind, MALFORMED_RULES[kind], {}, hash_from)
+
+
+# --- a pair with one table changed ---------------------------------------------------------------------------------------------
+
+
+def damaged_pair(truth: FixtureTruth, folder: Path, change, which: str = "train") -> Path:
+    """A copy of the fixture's two files in `folder` where `change(table)` is applied to the one called `which`; returns `folder`."""
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    for name, path in (("train", truth.train_path), ("eval", truth.eval_path)):
+        if name == which:
+            write_parquet(change(pq.read_table(path)), folder / f"{name}.parquet")
+        else:
+            (folder / f"{name}.parquet").write_bytes(path.read_bytes())
+    return folder
+
+
+def replace_column(table: pa.Table, name: str, values: pa.Array) -> pa.Table:
+    """`table` with the column `name` replaced by `values` (same field)."""
+    return table.set_column(table.schema.get_field_index(name), table.schema.field(name), values)

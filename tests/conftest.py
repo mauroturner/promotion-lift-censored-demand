@@ -184,3 +184,26 @@ def canonical(cfg, fixture_truth):
     train, _ = read_source(accepted.source.train_path, "train", accepted)
     eval_, _ = read_source(accepted.source.eval_path, "eval", accepted)
     return make_canonical((train, eval_), accepted)
+
+
+@pytest.fixture(scope="session")
+def published(cfg, canonical, tmp_path_factory: pytest.TempPathFactory):
+    """Every delivery of the plan, published once from the standard fixture: ``plan``, ``out_dir`` and ``items[delivery_id] = (entry, days, cube)``
+    with the delivery read back from its two files."""
+    from dataclasses import dataclass, field
+
+    from promolift.deliveries import delivery_plan, publish, read_delivery
+
+    @dataclass
+    class Published:
+        plan: list
+        out_dir: Path
+        items: dict = field(default_factory=dict)
+
+    out = tmp_path_factory.mktemp("deliveries")
+    result = Published(delivery_plan(cfg), out)
+    for spec in result.plan:
+        entry = publish(spec, canonical, out, cfg)
+        days, cube = read_delivery(out, entry)
+        result.items[spec.delivery_id] = (entry, days, cube)
+    return result
