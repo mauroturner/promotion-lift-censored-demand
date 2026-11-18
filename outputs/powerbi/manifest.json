@@ -1,0 +1,135 @@
+{
+ "as_of": "2024-07-03 00:00:00",
+ "attribution": "Dingdong-Inc, FreshRetailNet-50K, Hugging Face, CC BY 4.0, commit c374e859; Wang et al. (2026), arXiv:2505.16319.",
+ "eval_sha256": "1b118840664280c6b88bffc84c80ee1f54c05d911e354b7599e5da10995e960e",
+ "files": [
+  {
+   "bytes": 4351,
+   "name": "dim_date.parquet",
+   "sha256": "db8df234bfcddbc16b20a6b96fc412e1c8fba103a65218dad8224541d9b1eb96"
+  },
+  {
+   "bytes": 2279,
+   "name": "dim_hour.parquet",
+   "sha256": "4a8da857fbd72a7af6b439229f8abc6abd7b24c2e0f21525ba7b66ba2b34fd45"
+  },
+  {
+   "bytes": 1940,
+   "name": "dim_group.parquet",
+   "sha256": "9c8012c96988ee0a23729a75a837c12d49f811d51e30be0630c00a4195b4c41d"
+  },
+  {
+   "bytes": 2705,
+   "name": "dim_band.parquet",
+   "sha256": "757d33cbfeb32ad31d39c0e736ae2581d3d5c3abf549f62e83340cb5fcccedce"
+  },
+  {
+   "bytes": 3235,
+   "name": "dim_cell.parquet",
+   "sha256": "569a785f5db3b9cade6e2e59635f065087a65a82cf33790e3c88f31e41bc281f"
+  },
+  {
+   "bytes": 1915,
+   "name": "dim_version.parquet",
+   "sha256": "0d78926521a26d86dfdc7e0842e7ed79f45b33d080141886f1dafc5e492003b9"
+  },
+  {
+   "bytes": 2533,
+   "name": "dim_method.parquet",
+   "sha256": "36a9577152d413d74fa0520ad77bf2ef08a7898683c11382ad86666355d9d8ed"
+  },
+  {
+   "bytes": 2072,
+   "name": "dim_city.parquet",
+   "sha256": "6ef7bc046f7715be2bac15459b8d1cfafd6cf629599aea079d70c5be1da5964e"
+  },
+  {
+   "bytes": 3169,
+   "name": "dim_model.parquet",
+   "sha256": "368a5e8889297b87ce99dd5d125817b0f27a8e18f8d10384e76208b6aca91356"
+  },
+  {
+   "bytes": 6718,
+   "name": "dim_pipeline_run.parquet",
+   "sha256": "1093e58e5c35835ee1f285c58b7ca7d57bdca727e95459326e03476a55280f74"
+  },
+  {
+   "bytes": 18116,
+   "name": "fact_cell_effect.parquet",
+   "sha256": "7067824221defabc39e883f5230d722c045324f3692ed625810093387679767e"
+  },
+  {
+   "bytes": 6899,
+   "name": "fact_band_effect.parquet",
+   "sha256": "42ef2ab5aaf61db4f2ad27042f6499133fbd01469cec0083b561fdbf9534dd35"
+  },
+  {
+   "bytes": 4324,
+   "name": "fact_group_effect.parquet",
+   "sha256": "2285a3ba32002fdf9b11c10d45c524c69c1b14bbd5516e167eb3d5a979a60896"
+  },
+  {
+   "bytes": 4053,
+   "name": "fact_overall_effect.parquet",
+   "sha256": "b2bea2f1897e04569bc3675739c1e23969b301b50cfc249b9355af04bd1f6e6a"
+  },
+  {
+   "bytes": 21902,
+   "name": "fact_daily_cell.parquet",
+   "sha256": "d02e65e735bad5696e5892e86a3c1fe16bdb1be03b88d3b10f662076399febdf"
+  },
+  {
+   "bytes": 900154,
+   "name": "fact_hour_profile.parquet",
+   "sha256": "90a88e8e25371449ffc70a08e10b3172613f7b088217417044ec91e8104635d9"
+  },
+  {
+   "bytes": 267809,
+   "name": "fact_stockout_daily.parquet",
+   "sha256": "23264248d3072d579c95aa5e3241ad54dff15a787ab4b5366286ef7b6cf80209"
+  },
+  {
+   "bytes": 5995,
+   "name": "fact_recovery_check.parquet",
+   "sha256": "53f9cf7fc0db2a6fd22e8ae416e44bb3c3957b24a56ef92afaea4b4f9bba3c93"
+  },
+  {
+   "bytes": 3466,
+   "name": "fact_forecast.parquet",
+   "sha256": "0d8fd443d70018669104157c162114cc7f4d27d39943eeb6ef510f686e7aa820"
+  },
+  {
+   "bytes": 7734,
+   "name": "fact_replication.parquet",
+   "sha256": "b0506dd2f7cbf251c65944d587e90b999bb50d96852c85f8d096c68d3a2650f8"
+  },
+  {
+   "bytes": 7884,
+   "name": "fact_evaluation_summary.parquet",
+   "sha256": "519f7cbee4440c7fad77871ae7b659e633631e0a29e94d86790b8ca550926cac"
+  },
+  {
+   "bytes": 2635,
+   "name": "fact_example_day.parquet",
+   "sha256": "b175ce244bf1846013b2fa5324ae5a77da11e5643f234268e15cb03092eea663"
+  },
+  {
+   "bytes": 3670,
+   "name": "fact_leakage.parquet",
+   "sha256": "1fefd08702f87506986b2f66028c56115fc8a778ea09cba34bc6ef3d31abdf59"
+  },
+  {
+   "bytes": 6960,
+   "name": "fact_data_quality.parquet",
+   "sha256": "8f78510d4cef4d9c3beaf585ab1f0c19f0a07feefb97adc35e1d01b6fdf78dea"
+  },
+  {
+   "bytes": 7477,
+   "name": "fact_validation.parquet",
+   "sha256": "4fb5677287f11064569c059b59fd579edf17dd47b0561c26efe2b20a69756a7d"
+  }
+ ],
+ "run_key": "20261118T083929959268Z",
+ "train_sha256": "6706832db892bbae4969c19d87e07975d2543d2ba7d7d4756360654785de5a3d",
+ "version": 1
+}

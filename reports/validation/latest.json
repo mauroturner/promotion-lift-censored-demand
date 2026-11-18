@@ -1,0 +1,298 @@
+{
+  "run_key": "20261118T083929959268Z",
+  "train_sha256": "6706832db892bbae4969c19d87e07975d2543d2ba7d7d4756360654785de5a3d",
+  "eval_sha256": "1b118840664280c6b88bffc84c80ee1f54c05d911e354b7599e5da10995e960e",
+  "delivery_id": "C2024-07-03",
+  "series_days_delivery": 0,
+  "blocking_failed": false,
+  "not_evaluated": [
+    "I03",
+    "I04",
+    "M01",
+    "M02",
+    "M04",
+    "M06"
+  ],
+  "results": [
+    {
+      "rule_id": "V01",
+      "name_es": "Cada archivo existe y tiene el tamaño y la huella aceptados (o la registrada, en modo rápido)",
+      "severity": "blocking",
+      "scope": "source",
+      "aggregation": "source",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V02",
+      "name_es": "Esquema exacto: las 19 columnas de la fuente, en orden y con su tipo",
+      "severity": "blocking",
+      "scope": "source",
+      "aggregation": "source",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V03",
+      "name_es": "Archivo, filas y grupos de filas dentro de sus topes; metadatos de pyarrow leídos antes que los datos",
+      "severity": "blocking",
+      "scope": "source",
+      "aggregation": "source",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V04",
+      "name_es": "Cada lista horaria con 24 valores, sin nulos ni NaN; venta finita en [0, tope]; estado en {0, 1}; campos diarios que se usan completos",
+      "severity": "blocking",
+      "scope": "source",
+      "aggregation": "source",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V05",
+      "name_es": "(tienda, producto, día) único; día AAAA-MM-DD dentro de la ventana de su archivo; train y eval sin solaparse y contiguos",
+      "severity": "blocking",
+      "scope": "source",
+      "aggregation": "source",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V06",
+      "name_es": "Jerarquía: cada producto con una sola cadena de categorías y un grupo; cada tienda con una ciudad",
+      "severity": "blocking",
+      "scope": "source",
+      "aggregation": "source",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V07",
+      "name_es": "Cada serie tiene todos los días de su ventana, y son las mismas series en los dos archivos",
+      "severity": "blocking",
+      "scope": "source",
+      "aggregation": "source",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V10",
+      "name_es": "La entrega es la siguiente del plan y su período empieza el día siguiente al fin de la anterior",
+      "severity": "blocking",
+      "scope": "delivery",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V11",
+      "name_es": "Cada serie-día de la entrega está dentro de su período",
+      "severity": "blocking",
+      "scope": "delivery",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V12",
+      "name_es": "Ninguna serie-día de la entrega está ya en el almacén ni repetida dentro de ella",
+      "severity": "blocking",
+      "scope": "delivery",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V13",
+      "name_es": "Series-días, archivos y SHA-256 son los del manifiesto; solo el cierre puede no tener filas",
+      "severity": "blocking",
+      "scope": "delivery",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V14",
+      "name_es": "Las sumas del archivo de días son las del cubo de la entrega, recalculadas",
+      "severity": "blocking",
+      "scope": "delivery",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V15",
+      "name_es": "La entrega no trae ninguna columna prohibida",
+      "severity": "blocking",
+      "scope": "delivery",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V20",
+      "name_es": "Descuento 0 (se cuenta y se excluye del efecto)",
+      "severity": "warning",
+      "scope": "days",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V21",
+      "name_es": "Descuento mayor que 1 (se cuenta y se excluye del efecto)",
+      "severity": "warning",
+      "scope": "days",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V22",
+      "name_es": "Descuento entre 0 y 0,5 (se usa: es la banda 0)",
+      "severity": "warning",
+      "scope": "days",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V23",
+      "name_es": "Marca 1 con descuento 1 (se usa: banda 6)",
+      "severity": "warning",
+      "scope": "days",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V24",
+      "name_es": "Marca 0 con descuento menor que 0,999 (efecto aparte, nunca control)",
+      "severity": "warning",
+      "scope": "days",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V25",
+      "name_es": "Serie-día sin stock de 06 a 21 (se recupera con R1)",
+      "severity": "warning",
+      "scope": "days",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V26",
+      "name_es": "El total diario de la venta es distinto de la suma de las horas (se cuenta; el campo no pasa de la lectura)",
+      "severity": "warning",
+      "scope": "source",
+      "aggregation": "source",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "V27",
+      "name_es": "El conteo de horas sin stock del archivo es distinto del conteo de 06 a 21 (se cuenta; el campo no pasa de la lectura)",
+      "severity": "warning",
+      "scope": "source",
+      "aggregation": "source",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "I01",
+      "name_es": "Horas sin stock de 0 a 5 y de 22 a 23 (solo cuenta: no se recuperan)",
+      "severity": "info",
+      "scope": "days",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": [
+        {
+          "night_out_hours": 0,
+          "series_days": 0
+        }
+      ]
+    },
+    {
+      "rule_id": "I02",
+      "name_es": "Días con la marca de feriado (solo cuenta: los absorbe el factor del día)",
+      "severity": "info",
+      "scope": "days",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "M03",
+      "name_es": "El artefacto tiene la huella registrada, antes de leerlo, y el .npz no trae objetos",
+      "severity": "blocking",
+      "scope": "model",
+      "aggregation": "per_run",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    },
+    {
+      "rule_id": "M05",
+      "name_es": "La configuración es la sellada (si no, todo lo calculado es posterior al sello)",
+      "severity": "warning",
+      "scope": "model",
+      "aggregation": "latest",
+      "status": "pass",
+      "series_days_affected": 0,
+      "hours_affected": 0,
+      "examples": []
+    }
+  ]
+}
