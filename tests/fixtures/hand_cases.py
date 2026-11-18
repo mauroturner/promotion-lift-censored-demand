@@ -81,6 +81,13 @@ BOOTSTRAP = {
 TIERS_CELLS = [("a", 0.9, 0.7, 1.1), ("b", 0.8, 0.6, 1.0), ("c", 0.5, 0.4, 0.6), ("d", 0.3, 0.2, 0.35), ("e", 0.1, -0.1, 0.25)]
 TIERS_EXPECTED = {"tier": {"a": 1, "b": 1, "c": 1, "d": 2, "e": 2}, "overlapping_pairs": {("a", "b"), ("b", "c"), ("d", "e")}, "pairs": 10}
 
+# --- a cell that overlaps a cell of a group the walk already closed (the evaluation's B1, L85): q opens a second group because it overlaps nothing of
+# the open one, and r overlaps both q and p, so p, q and r are one connected component of the overlap graph (RF15); s overlaps nobody. The sealed walk
+# (D13 as the plan wrote it) gives p 1, q and r 2 and s 3.
+CLOSED_GROUP_CELLS = [("p", 7.0, 6.0, 8.0), ("q", 5.0, 4.5, 5.5), ("r", 4.8, 3.0, 6.2), ("s", 1.0, 0.5, 1.5)]
+CLOSED_GROUP_EXPECTED = {"overlap_group": {"p": 1, "q": 1, "r": 1, "s": 2}, "sealed_tier": {"p": 1, "q": 2, "r": 2, "s": 3},
+                         "overlapping_pairs": {("p", "r"), ("q", "r")}}
+
 # --- the metrics (requirements, section 8.1): the WAPE of the mass per series, the bias and the forecast WAPE ---------------------------------
 METRICS = {
     "truth": [10.0, 20.0, 30.0],

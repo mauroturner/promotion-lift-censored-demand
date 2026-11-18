@@ -1,7 +1,7 @@
 """The star model for Power BI: the marts in SQLite and one Parquet file per table (RF20, AC24; D35; plan, section 19). Adapted from project 05's ``export.py``.
 
 ``build_powerbi_marts`` loads the reference tables that come from the code, the registry, the seal and the cube (``ref_*``: the versions, methods, blocks, weekdays, hours and
-bands with their labels in Spanish, the state of the seal of the launch and the example series-day), rebuilds the tables of ``sql/marts/powerbi`` (``star_<name>``) and runs the
+bands with their labels in Spanish, the state of the seal of the launch, the example series-day and the indistinguishable group of every ranked cell, D45), rebuilds the tables of ``sql/marts/powerbi`` (``star_<name>``) and runs the
 controls of ``sql/checks/model``, all in one transaction: a control with rows undoes it. Everything is **as of the run's instant**: a day that had not closed is not in the marts,
 and nothing of the test week is while the week has not closed (D05, RNF06 a).
 
@@ -32,6 +32,7 @@ from promolift.deliveries import delivery_plan
 from promolift.files import write_atomic
 from promolift.forecast import METHODS as FORECAST_METHODS
 from promolift.launch import FIT_BLOCKS_VALID, launch_keys
+from promolift.ranking import overlap_groups
 from promolift.registry import MODEL_VERSION, RunMeta, read_registry, read_seal
 from promolift.warehouse import SQL_DIR, _fail_on, apply_schema, rebuild_marts, run_checks, run_sql_file, sql_params, stage_series_days
 
@@ -99,6 +100,20 @@ def _launch_seal_state(conn: sqlite3.Connection, seal_path: Path) -> str:
     return "sealed" if seal is not None and registered["config_sha256"] == seal["launch"]["config_sha256"] else "post_seal"
 
 
+def overlap_group_rows(conn: sqlite3.Connection) -> list[tuple[str, str, str, int]]:
+    """``(scope, version, cell, group)`` for every ranked cell of ``effect_estimates``: its indistinguishable group within its scope and version (RF15, D45), computed
+    from the stored lifts and intervals with ``ranking.overlap_groups``. It is a post-seal reading of sealed values: no stored value changes, and the sealed ``tier`` stays."""
+    cells = conn.execute("SELECT scope, version, unit_key, lift, ci_low, ci_high FROM effect_estimates WHERE unit = 'cell' AND control = 'regular' AND ranked = 1 "
+                         "ORDER BY scope, version, unit_key").fetchall()
+    rows: list[tuple[str, str, str, int]] = []
+    for scope, version in dict.fromkeys((c[0], c[1]) for c in cells):
+        part = [c for c in cells if (c[0], c[1]) == (scope, version)]
+        lift, low, high = (np.array([c[k] for c in part], dtype=np.float64) for k in (3, 4, 5))
+        groups = overlap_groups(lift, low, high, np.ones(len(part), dtype=bool))
+        rows += [(scope, version, c[2], int(g)) for c, g in zip(part, groups, strict=True)]
+    return rows
+
+
 def _load_references(conn: sqlite3.Connection, view: Any, interim_dir: Path, seal_path: Path) -> None:
     """The ``ref_*`` tables the marts read."""
     first, last = view.calendar.day_hours
@@ -115,6 +130,7 @@ def _load_references(conn: sqlite3.Connection, view: Any, interim_dir: Path, sea
     _replace(conn, "ref_band", "band_key INTEGER PRIMARY KEY, discount_low REAL, discount_high REAL, depth_label_es TEXT",
              [(k, bands[k], bands[k + 1], texts.band_label(bands, k)) for k in range(len(bands) - 1)])
     _replace(conn, "ref_seal", "launch_state TEXT", [(_launch_seal_state(conn, seal_path),)])
+    _replace(conn, "ref_overlap_group", "scope TEXT, version TEXT, cell_key TEXT, overlap_group INTEGER, PRIMARY KEY (scope, version, cell_key)", overlap_group_rows(conn))
     chosen = None
     folder = Path(interim_dir)
     if (folder / "cube").is_dir():

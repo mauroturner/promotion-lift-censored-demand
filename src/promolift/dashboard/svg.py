@@ -1,5 +1,5 @@
 """Small SVG charts for the dashboard design: previews with real numbers, no scripts and no external files (adapted from project 05's ``dashboard/svg.py``; ``interval_chart``
-and ``scatter_chart`` are this project's: the cells with their intervals and tiers, and the sealed lift against the one of the test week).
+and ``scatter_chart`` are this project's: the cells with their intervals and indistinguishable groups, and the sealed lift against the one of the test week).
 
 Every function returns one inline ``<svg>`` string with no namespace declaration, which an HTML page does not need and which would be the only address in the document (``standalone`` adds it
 for a file of its own). Colors are CSS custom properties (``--series-1`` ... and the text and grid tokens) declared by the page, so light and dark mode swap in one
@@ -265,8 +265,8 @@ def grouped_bar_chart(groups: list[tuple[str, dict[str, float]]], width: int, he
 
 
 def interval_chart(items: list[tuple[str, float, float, float, int | None]], width: int, height: int, title: str) -> str:
-    """Horizontal intervals, one per ``(label, low, value, high, tier)``: a whisker from the low to the high limit and a dot at the value, in the color of the tier (cells of the
-    same color do not differ from each other, because their intervals overlap); a cell with no tier is drawn in grey."""
+    """Horizontal intervals, one per ``(label, low, value, high, group)``: a whisker from the low to the high limit and a dot at the value, in the color of the cell's
+    indistinguishable group (cells of the same color do not differ from each other, because their intervals overlap, D45); a cell with no group is drawn in grey."""
     items = [(label, lo, v, hi, tier) for label, lo, v, hi, tier in items if _finite(lo) and _finite(v) and _finite(hi)]
     if not items:
         return _empty(width, height, title)

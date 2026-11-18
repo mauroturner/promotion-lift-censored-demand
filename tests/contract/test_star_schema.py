@@ -7,6 +7,7 @@ import dataclasses
 import json
 from pathlib import Path
 
+import numpy as np
 import pyarrow.parquet as pq
 import pytest
 
@@ -145,7 +146,25 @@ def test_the_effect_facts_say_what_they_were_fitted_with_and_under_which_seal_an
     ranked = cells[(cells["scope"] == "launch") & (cells["version_key"] == "recovered") & cells["ranked"]].sort_values("rank")
     assert ranked["rank"].tolist() == list(range(1, len(ranked) + 1)) and ranked["lift"].is_monotonic_decreasing and ranked["tier"].is_monotonic_increasing
     stored = connect(star_export.db).execute("SELECT unit_key, ranked, tier FROM effect_estimates WHERE scope = 'launch' AND version = 'recovered' AND unit = 'cell' AND ranked = 1").fetchall()
-    assert {(r.cell_key, r.tier) for r in ranked.itertuples()} == {(k, t) for k, _r, t in stored}
+    assert {(r.cell_key, r.tier) for r in ranked.itertuples()} == {(k, t) for k, _r, t in stored}, "the tier is the one stored (and sealed): it is not recomputed"
+
+
+def test_the_published_indistinguishable_groups_are_the_connected_components_of_the_overlap_graph_and_the_sealed_tier_is_kept(star_export):
+    """B1 (L85; RF15, D45): in every scope and version, two ranked cells whose intervals overlap share an ``overlap_group``, a group is one connected run of intervals,
+    the groups are numbered from the largest lift, and the ``tier`` beside it is the stored one, whatever it says."""
+    from promolift.ranking import overlap_groups
+
+    cells = read(star_export.out, "fact_cell_effect").to_pandas()
+    assert cells.loc[~cells["ranked"], "overlap_group"].isna().all() and cells.loc[cells["ranked"], "overlap_group"].notna().all()
+    for (scope, version), part in cells[cells["ranked"]].groupby(["scope", "version_key"]):
+        part = part.sort_values("rank")
+        low, high, group = part["ci_low"].to_numpy(), part["ci_high"].to_numpy(), part["overlap_group"].astype(int).to_numpy()
+        for i in range(len(part)):
+            for j in range(i + 1, len(part)):
+                if not (high[i] < low[j] or high[j] < low[i]):
+                    assert group[i] == group[j], (scope, version, part["cell_key"].iloc[i], part["cell_key"].iloc[j])
+        assert group[0] == 1 and (np.diff(group) >= 0).all() and set(group.tolist()) == set(range(1, group.max() + 1)), (scope, version)
+        assert group.tolist() == overlap_groups(part["lift"].to_numpy(), low, high, np.ones(len(part), dtype=bool)).tolist()
     bands = read(star_export.out, "fact_band_effect").to_pandas()
     assert set(bands["day_state"]) == {"promo", "unflagged_cut"} and {"regular", "any_flag0"} == set(bands["control"]) and set(bands["seal_state"]) == {"sealed"}
     overall = read(star_export.out, "fact_overall_effect").to_pandas()
@@ -346,9 +365,13 @@ def _params(view, run):
     ("chk_interval_contains_lift", "UPDATE star_fact_cell_effect SET ci_low = ci_high + 1 WHERE rank = 1 AND scope = 'launch' AND version_key = 'recovered'"),
     ("chk_ranked_cells_have_min_series", "UPDATE star_fact_cell_effect SET series = 1 WHERE rank = 1 AND scope = 'launch' AND version_key = 'recovered'"),
     ("chk_ranked_cells_have_min_series", "UPDATE star_fact_cell_effect SET rank = 3 WHERE ranked = 0"),
-    ("chk_tiers_are_overlap_groups", "UPDATE star_fact_cell_effect SET tier = 2 WHERE rank = 2 AND scope = 'launch' AND version_key = 'recovered'"),
-    ("chk_tiers_are_overlap_groups", "UPDATE star_fact_cell_effect SET tier = 1, ci_low = 100, ci_high = 101 WHERE scope = 'launch' AND version_key = 'recovered' AND rank = (SELECT MAX(rank) FROM star_fact_cell_effect "
-                                    "WHERE scope = 'launch' AND version_key = 'recovered')"),
+    ("chk_tiers_follow_the_sealed_walk", "UPDATE star_fact_cell_effect SET tier = 2 WHERE rank = 2 AND scope = 'launch' AND version_key = 'recovered'"),
+    ("chk_tiers_follow_the_sealed_walk", "UPDATE star_fact_cell_effect SET tier = 1, ci_low = 100, ci_high = 101 WHERE scope = 'launch' AND version_key = 'recovered' AND rank = (SELECT MAX(rank) FROM star_fact_cell_effect "
+                                         "WHERE scope = 'launch' AND version_key = 'recovered')"),
+    ("chk_overlap_groups_are_components", "UPDATE star_fact_cell_effect SET overlap_group = NULL WHERE rank = 1 AND scope = 'launch' AND version_key = 'recovered'"),
+    ("chk_overlap_groups_are_components", "UPDATE star_fact_cell_effect SET overlap_group = 1 WHERE ranked = 0 AND rowid = (SELECT MIN(rowid) FROM star_fact_cell_effect WHERE ranked = 0)"),
+    ("chk_overlap_groups_are_components", "UPDATE star_fact_cell_effect SET overlap_group = overlap_group + 100 WHERE rank = 2 AND scope = 'launch' AND version_key = 'recovered'"),
+    ("chk_overlap_groups_are_components", "UPDATE star_fact_cell_effect SET ci_low = -1000, ci_high = -999, lift = -999.5 WHERE scope = 'launch' AND version_key = 'recovered' AND rank = 2"),
     ("chk_one_daily_cell_per_key", "DELETE FROM star_fact_daily_cell WHERE rowid = (SELECT MIN(rowid) FROM star_fact_daily_cell)"),
     ("chk_one_daily_cell_per_key", "INSERT INTO star_fact_daily_cell SELECT 20240626, version_key, 'g99-b9', observed, counterfactual, lift, series_days, stockout_hours FROM star_fact_daily_cell LIMIT 1"),
     ("chk_forecasts_only_promo_days", "UPDATE series_days SET day_state = 'regular' WHERE (series_key, date_key) = (SELECT series_key, date_key FROM forecasts WHERE scope = 'test' LIMIT 1)"),

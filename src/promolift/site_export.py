@@ -110,7 +110,7 @@ def _overall(conn: sqlite3.Connection, scope: str, version: str, estimator: str,
 
 
 def _launch_cells(conn: sqlite3.Connection, version: str) -> pd.DataFrame:
-    return _query(conn, "SELECT cell_key, lift, ci_low, ci_high, series, series_days, ranked, rank, tier FROM star_fact_cell_effect WHERE scope = 'launch' AND version_key = ? "
+    return _query(conn, "SELECT cell_key, lift, ci_low, ci_high, series, series_days, ranked, rank, tier, overlap_group FROM star_fact_cell_effect WHERE scope = 'launch' AND version_key = ? "
                         "AND ci_kind = 'two_way' AND seal_state = 'sealed' ORDER BY cell_key", (version,))
 
 
@@ -158,6 +158,7 @@ def _summary(conn: sqlite3.Connection, run: RunMeta, view: Any, summary: dict[st
                      "recovered": _estimate(_overall(conn, "launch", "recovered", "counterfactual", "regular"))},
             "recovery": {"method": launch.get("recovery", {}).get("method"), "kappa": launch.get("recovery", {}).get("kappa"), "wape_v2": _num(launch.get("recovery", {}).get("wape_v2"), 3)},
             "cells_ranked": int(cells["ranked"].sum()) if len(cells) else 0, "tiers": int(cells[cells["ranked"] == 1]["tier"].nunique()) if len(cells) else 0,
+            "overlap_groups": int(cells[cells["ranked"] == 1]["overlap_group"].nunique()) if len(cells) else 0,
             "pairs": pairs.get("pairs"), "pairs_overlapping": pairs.get("overlapping")},
         "criteria": criteria,
         "seal": summary.get("seal") or {"config_sha256": None, "launch_run_key": None, "test_run_key": None, "test_as_of": None}}
@@ -228,7 +229,8 @@ def _algorithms(conn: sqlite3.Connection, view: Any, seal: dict[str, Any] | None
     for key, row in recovered.iterrows():
         group, band = _split_cell(str(key))
         cells.append({"cell": key, "group": group, "band": band, "raw": _num(raw["lift"].get(key), 3), "recovered": _num(row["lift"], 3), "ci_low": _num(row["ci_low"], 3),
-                      "ci_high": _num(row["ci_high"], 3), "series": _int(row["series"]), "ranked": bool(row["ranked"]), "rank": _int(row["rank"]), "tier": _int(row["tier"])})
+                      "ci_high": _num(row["ci_high"], 3), "series": _int(row["series"]), "ranked": bool(row["ranked"]), "rank": _int(row["rank"]), "tier": _int(row["tier"]),
+                      "overlap_group": _int(row["overlap_group"])})
     recovery = _query(conn, "SELECT scope, method_key, fit_blocks, wape_series, bias, chosen FROM star_fact_recovery_check WHERE mask = 'tail' AND seal_state = 'sealed' ORDER BY scope, method_key")
     pairs = _query(conn, "SELECT ci_kind, pairs, overlapping, median_width FROM eval_pairs WHERE scope = 'launch'")
     two, only = pairs[pairs["ci_kind"] == "two_way"], pairs[pairs["ci_kind"] == "series_only"]
@@ -272,6 +274,8 @@ def _operation(conn: sqlite3.Connection) -> dict[str, Any]:
     forecast = _query(conn, "SELECT scope, method_key, fit_blocks, wape, bias FROM star_fact_forecast WHERE seal_state = 'sealed'")
     cells = _launch_cells(conn, "recovered")
     tiers = [{"tier": int(t), "cells": sorted(part["cell_key"]), "lift_max": _num(part["lift"].max(), 3), "lift_min": _num(part["lift"].min(), 3)} for t, part in cells[cells["ranked"] == 1].groupby("tier")]
+    groups = [{"overlap_group": int(g), "cells": sorted(part["cell_key"]), "lift_max": _num(part["lift"].max(), 3), "lift_min": _num(part["lift"].min(), 3)}
+              for g, part in cells[cells["ranked"] == 1].groupby("overlap_group")]
     methods = []
     for name in FORECAST_METHODS:
         valid, test = forecast[(forecast["scope"] == "valid") & (forecast["method_key"] == name)], forecast[(forecast["scope"] == "test") & (forecast["method_key"] == name)]
@@ -280,7 +284,7 @@ def _operation(conn: sqlite3.Connection) -> dict[str, Any]:
                         "valid_fit_blocks": valid["fit_blocks"].iloc[0] if len(valid) else None})
     return {"days": days, "day_bands": day_bands,
             "replication": [{"cell": r.cell_key, "launch": _num(r.lift_launch, 3), "test": _num(r.lift_test, 3), "consistent": None if pd.isna(r.consistent) else bool(r.consistent)} for r in replication.itertuples()],
-            "forecast": methods, "tiers_now": tiers}
+            "forecast": methods, "tiers_now": tiers, "overlap_groups_now": groups}
 
 
 # --- validation_rules.json ----------------------------------------------------------------------------------------------------------

@@ -202,7 +202,7 @@ def _cards(data: _Data) -> dict:
         "[Lo que esconden los quiebres]": lambda: _card(DASH if recovered is None or raw is None else f"{(recovered['lift'] - raw['lift']) * 100:.1f} puntos".replace(".", ","), "recuperado menos crudo"),
         "[Aumento de la cuenta ingenua]": lambda: _card(_pct(None if naive is None else naive["lift"]), "mezcla productos"),
         "[Celdas ordenadas]": lambda: _card(_int(cells["ranked"].astype(bool).sum()), f"de {len(cells)} celdas"),
-        "[Grupos indistinguibles]": lambda: _card(_int(cells[cells["ranked"].astype(bool)]["tier"].nunique()), "los intervalos que se pisan no se distinguen"),
+        "[Grupos indistinguibles]": lambda: _card(_int(cells[cells["ranked"].astype(bool)]["overlap_group"].nunique()), "los intervalos que se pisan no se distinguen"),
         "[Celdas que mantienen su nivel (%)]": lambda: _card(_pct(comparable["consistent"].mean() if len(comparable) else None), f"de {len(comparable)} celdas comparables"),
         "[Series-días con promoción (%)]": lambda: _card(_pct(quality["promo"].sum() / quality["series_days"].sum() if quality["series_days"].sum() else None), f"de {_int(quality['series_days'].sum())} series-días"),
         "[Reglas bloqueantes fallidas]": lambda: _card(_int((rules["status"] == "falla").sum()), "en las corridas cargadas"),
@@ -215,7 +215,7 @@ def _cell_intervals(data: _Data, v: Visual) -> str:
     cells = cells[(cells["scope"] == "launch") & (cells["version_key"] == "recovered") & cells["ranked"].astype(bool)].sort_values("rank")
     width, height = _size(v)
     shown = cells.head(max(height // 11, 1))
-    items = [(row.cell_key, row.ci_low, row.lift, row.ci_high, row.tier) for row in shown.itertuples()]
+    items = [(row.cell_key, row.ci_low, row.lift, row.ci_high, row.overlap_group) for row in shown.itertuples()]
     return svg.interval_chart(items, width, height - 14, v.title_es) + _caption(f"Las celdas del mismo color no se distinguen entre sí; {len(shown)} de {len(cells)} celdas ordenadas.")
 
 

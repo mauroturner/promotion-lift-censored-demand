@@ -203,7 +203,8 @@ Hecho. El aumento de cada celda por alcance y versión, con su intervalo y su lu
 | `series_days` | entero 32 | series-días | Series-días en la unidad. |
 | `ranked` | verdadero/falso | — | La celda tiene series suficientes y entra en el ranking. |
 | `rank` | entero 32 | — | Lugar en el ranking por aumento (1 es el mayor); vacío si no se ordena. |
-| `tier` | entero 32 | — | Grupo indistinguible: las celdas del mismo número no se distinguen entre sí; vacío si no se ordena. |
+| `tier` | entero 32 | — | Grupo sellado: el número que guarda el sello, de un recorrido que compara cada celda solo con el grupo abierto, así que dos celdas que se pisan pueden quedar en grupos distintos (B1, D45); vacío si no se ordena. No es el grupo indistinguible. |
+| `overlap_group` | entero 32 | — | Grupo indistinguible: las celdas unidas por intervalos que se pisan, directamente o por una cadena de celdas (componentes conexos del grafo de solapes, RF15); 1 es el del mayor aumento; análisis posterior al sello sobre los intervalos sellados (D45); vacío si no se ordena. |
 | `fit_blocks` | texto | — | Con qué bloques se ajustó el método que dio la cifra (train, o el período del lanzamiento): nada se mide como fuera de muestra con su propio bloque. |
 | `seal_state` | texto | — | sealed (la configuración sellada) o post_seal (otra, posterior al sello). |
 

@@ -29,10 +29,10 @@ KEYS = {
     "summary.json": {"status", "evaluation_status", "headline", "criteria", "seal"},
     "data.json": {"hierarchy", "hour_profile", "first_stockout", "day_states", "discount_bins", "anomalies", "night_share", "split"},
     "algorithms.json": {"naive_vs_adjusted", "example_day", "recovery", "bands", "groups", "cells", "intervals", "leakage"},
-    "operation.json": {"days", "day_bands", "replication", "forecast", "tiers_now"},
+    "operation.json": {"days", "day_bands", "replication", "forecast", "tiers_now", "overlap_groups_now"},
     "validation_rules.json": {"rules", "totals"}}
-HEADLINE = {"series", "stores", "cities", "products", "days", "period_start", "period_end", "stockout_share", "promo_share", "recovered_share", "lift", "recovery", "cells_ranked", "tiers", "pairs",
-            "pairs_overlapping"}
+HEADLINE = {"series", "stores", "cities", "products", "days", "period_start", "period_end", "stockout_share", "promo_share", "recovered_share", "lift", "recovery", "cells_ranked", "tiers", "overlap_groups",
+            "pairs", "pairs_overlapping"}
 CRITERION = {"id", "name_es", "passed", "value", "baseline_value", "ci_low", "ci_high", "threshold_es", "seen_by_research", "seen_by_planner", "verdict_es"}
 
 
@@ -66,7 +66,7 @@ def test_the_five_files_follow_their_schema_and_stay_under_the_limit(star_export
     assert set(data["anomalies"]) == {"discount_zero", "discount_over_one", "deep_band", "flag_without_cut", "cut_without_flag"} and set(data["hierarchy"]) == {"stores", "cities", "products", "groups", "first_categories"}
     algorithms = site.algorithms
     assert len(algorithms["bands"]) == 7 and len(algorithms["groups"]) == 7 and len(algorithms["cells"]) == 49 and len(algorithms["example_day"]["hour"]) == 16
-    assert set(algorithms["cells"][0]) == {"cell", "group", "band", "raw", "recovered", "ci_low", "ci_high", "series", "ranked", "rank", "tier"} and set(algorithms["bands"][0]) == {
+    assert set(algorithms["cells"][0]) == {"cell", "group", "band", "raw", "recovered", "ci_low", "ci_high", "series", "ranked", "rank", "tier", "overlap_group"} and set(algorithms["bands"][0]) == {
         "band", "label_es", "raw", "recovered", "ci_low", "ci_high", "series", "unflagged"}
     assert set(algorithms["intervals"]) == {"two_way_median_width", "series_only_median_width", "pairs", "overlapping_two_way", "overlapping_series_only"} and set(algorithms["leakage"]) == {
         "sale_amount_recovery_wape", "sealed_wape", "note_es"}
@@ -94,7 +94,7 @@ def test_every_figure_is_the_one_of_the_parquet_files_of_the_same_run(star_expor
     for c in site.algorithms["cells"]:
         row = mine.loc[c["cell"]]
         assert (c["recovered"], c["ci_low"], c["ci_high"], c["series"], c["ranked"]) == (round(row["lift"], 3), round(row["ci_low"], 3), round(row["ci_high"], 3), int(row["series"]), bool(row["ranked"]))
-        assert (c["rank"], c["tier"]) == ((None if pd.isna(row["rank"]) else int(row["rank"])), (None if pd.isna(row["tier"]) else int(row["tier"])))
+        assert (c["rank"], c["tier"], c["overlap_group"]) == tuple(None if pd.isna(row[k]) else int(row[k]) for k in ("rank", "tier", "overlap_group"))
     summary = parquet(star_export, "fact_evaluation_summary")
     summary = summary[summary["seal_state"] == "sealed"].set_index("criterion_id")
     for c in site.summary["criteria"]:

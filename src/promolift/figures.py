@@ -50,7 +50,7 @@ def figure_data(site: SiteFiles) -> dict[str, dict[str, Any]]:
         "band_lift": {"label": [b["label_es"] for b in algorithms["bands"]], "raw": _none([b["raw"] for b in algorithms["bands"]]), "recovered": _none([b["recovered"] for b in algorithms["bands"]]),
                       "unflagged": _none([b["unflagged"] for b in algorithms["bands"]])},
         "cell_ranking": {"cell": [c["cell"] for c in ranked], "recovered": [c["recovered"] for c in ranked], "ci_low": [c["ci_low"] for c in ranked], "ci_high": [c["ci_high"] for c in ranked],
-                         "tier": [c["tier"] for c in ranked]},
+                         "group": [c["overlap_group"] for c in ranked]},
         "replication": {"cell": [r["cell"] for r in operation["replication"]], "launch": _none([r["launch"] for r in operation["replication"]]), "test": _none([r["test"] for r in operation["replication"]]),
                         "consistent": [r["consistent"] for r in operation["replication"]]},
         "forecast_wape": {"scope": "test" if sealed_forecast else "valid", "method": [m["label_es"] for m in operation["forecast"]],
@@ -153,8 +153,8 @@ def _cell_ranking(d: dict) -> bytes:
     if not d["cell"]:
         _empty(ax, "Sin celdas ordenadas")
     else:
-        for i, (cell, lift, low, high, tier) in enumerate(zip(d["cell"], d["recovered"], d["ci_low"], d["ci_high"], d["tier"], strict=True)):
-            color = COLORS[(tier - 1) % len(COLORS)]
+        for i, (cell, lift, low, high, group) in enumerate(zip(d["cell"], d["recovered"], d["ci_low"], d["ci_high"], d["group"], strict=True)):
+            color = COLORS[(group - 1) % len(COLORS)]
             ax.plot([low * 100, high * 100], [i, i], color=color, lw=2)
             ax.plot([lift * 100], [i], "o", color=color)
         ax.set_yticks(range(len(d["cell"])), d["cell"], fontsize=7)

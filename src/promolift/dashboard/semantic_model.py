@@ -155,7 +155,11 @@ FACT_CELL_EFFECT = Table("fact_cell_effect", "fact", ("scope", "version_key", "c
     _c("counterfactual", "float64", "Suma de lo que el modelo dice para esas series-días sin promoción (venta normalizada)."), LIFT, CI_LOW, CI_HIGH,
     _c("ci_kind", "string", "Intervalo: two_way (series y días) o series_only."), SERIES, SERIES_DAYS,
     _c("ranked", "bool", "La celda tiene series suficientes y entra en el ranking."), _c("rank", "int32", "Lugar en el ranking por aumento (1 es el mayor); vacío si no se ordena."),
-    _c("tier", "int32", "Grupo indistinguible: las celdas del mismo número no se distinguen entre sí; vacío si no se ordena."), FIT_BLOCKS, SEAL_STATE,
+    _c("tier", "int32", "Grupo sellado: el número que guarda el sello, de un recorrido que compara cada celda solo con el grupo abierto, así que dos celdas que se pisan "
+                        "pueden quedar en grupos distintos (B1, D45); vacío si no se ordena. No es el grupo indistinguible."),
+    _c("overlap_group", "int32", "Grupo indistinguible: las celdas unidas por intervalos que se pisan, directamente o por una cadena de celdas (componentes conexos del "
+                                 "grafo de solapes, RF15); 1 es el del mayor aumento; análisis posterior al sello sobre los intervalos sellados (D45); vacío si no se ordena."),
+    FIT_BLOCKS, SEAL_STATE,
 ), "El aumento de cada celda por alcance y versión, con su intervalo y su lugar en el ranking.")
 FACT_BAND_EFFECT = Table("fact_band_effect", "fact", ("scope", "version_key", "band_key", "control", "day_state", "seal_state"), (
     SCOPE_EFFECT, VERSION_KEY, BAND_KEY, _c("control", "string", "Días de control: regular (sin marca y sin rebaja) o any_flag0 (cualquier día sin marca)."), LIFT, CI_LOW, CI_HIGH,
@@ -265,8 +269,9 @@ MEASURES: tuple[Measure, ...] = (
     Measure("Límite superior", f"CALCULATE ( SELECTEDVALUE ( fact_cell_effect[ci_high] ), {_CELL} )", PERCENT, "Límite superior del intervalo del 95 % del aumento de la celda."),
     Measure("Celdas ordenadas", f'CALCULATE ( COUNTROWS ( fact_cell_effect ), fact_cell_effect[ranked] = TRUE (), {_LAUNCH_CELLS}, fact_cell_effect[ci_kind] = "two_way" )', INTEGER,
             "Celdas del lanzamiento con series suficientes para entrar en el ranking, en la demanda recuperada."),
-    Measure("Grupos indistinguibles", f"CALCULATE ( DISTINCTCOUNT ( fact_cell_effect[tier] ), fact_cell_effect[ranked] = TRUE (), {_LAUNCH_CELLS} )", INTEGER,
-            "Grupos de celdas que no se distinguen entre sí (sus intervalos se pisan) en el ranking del lanzamiento."),
+    Measure("Grupos indistinguibles", f"CALCULATE ( DISTINCTCOUNT ( fact_cell_effect[overlap_group] ), fact_cell_effect[ranked] = TRUE (), {_LAUNCH_CELLS} )", INTEGER,
+            "Grupos de celdas que no se distinguen entre sí (sus intervalos se pisan, directamente o por una cadena de celdas) en el ranking del lanzamiento; análisis "
+            "posterior al sello (D45)."),
     Measure("Aumento total recuperado", f'CALCULATE ( SELECTEDVALUE ( fact_overall_effect[lift] ), fact_overall_effect[version_key] = "recovered", '
                                         f'fact_overall_effect[estimator] = "counterfactual", fact_overall_effect[control] = "regular", {_OVERALL} )', PERCENT,
             "Aumento total del lanzamiento con la demanda recuperada, contra el contrafactual de la misma serie y la misma hora. La medida fija la versión: el segmentador de versión no la cambia."),
@@ -313,7 +318,7 @@ PAGES: tuple[Page, ...] = (
         Visual("card", "Celdas ordenadas", ("[Celdas ordenadas]",), 8, 1, 2, 1),
         Visual("card", "Grupos indistinguibles", ("[Grupos indistinguibles]",), 10, 1, 2, 1),
         Visual("barChart", "Celdas ordenadas por aumento, con su intervalo y su grupo indistinguible", ("dim_cell[label_es]", "[Aumento]", "[Límite inferior]", "[Límite superior]",
-                                                                                                      "fact_cell_effect[tier]"), 0, 2, 8, 7),
+                                                                                                      "fact_cell_effect[overlap_group]"), 0, 2, 8, 7),
         Visual("table", "Celdas con pocas series, sin ordenar", ("dim_cell[label_es]", "fact_cell_effect[series]", "fact_cell_effect[ranked]", "[Aumento]"), 8, 2, 4, 7),
     )),
     Page("Las horas sin stock y la demanda que esconden", (
