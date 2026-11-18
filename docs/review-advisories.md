@@ -235,7 +235,7 @@ Tramo `75456e7..a5f6ebd` (las advertencias de la evaluación y las pruebas de la
 - **S4**
   - Hallazgo: un recorrido de las tablas difícil de leer en `test_every_markdown_table_has_as_many_cells_in_its_delimiter_and_its_rows_as_in_its_header`.
   - Ubicación: `tests/docs/test_docs.py:582` en `a5f6ebd` (el cálculo de `body`).
-  - Estado: **corregida** en `0000000`: el cuerpo de la tabla se arma en tres líneas con nombres, con el mismo resultado.
+  - Estado: **corregida** en `2eeeba6`: el cuerpo de la tabla se arma en tres líneas con nombres, con el mismo resultado.
 
 ## 38a6c56 (L87)
 
@@ -244,12 +244,12 @@ Tramo `6843245..38a6c56` (la documentación de las correcciones): aprobada con d
 - **W1**
   - Hallazgo: `docs/paso-a-paso.md:3` dice que la evaluación independiente y sus correcciones «no se hicieron todavía» y no están ahí, contra sus propias secciones 7 y 8.
   - Ubicación: `docs/paso-a-paso.md:3`.
-  - Estado: **corregida** en `0000000`: la introducción dice lo que las secciones cuentan (la evaluación, las correcciones, la comprobación y esta sincronización, L85 a L88) y que lo que falta es la página del sitio y el `.pbix`.
+  - Estado: **corregida** en `2eeeba6`: la introducción dice lo que las secciones cuentan (la evaluación, las correcciones, la comprobación y esta sincronización, L85 a L88) y que lo que falta es la página del sitio y el `.pbix`.
 
 - **S1**
   - Hallazgo: la tupla `DOCS` de `tests/docs/test_docs.py` no incluye `evaluation.md`.
   - Ubicación: `tests/docs/test_docs.py` (`DOCS`).
-  - Estado: **corregida** en `0000000`: `evaluation.md` está en la tupla y la prueba `test_the_evaluation_and_its_check_are_recorded_as_done_and_no_document_says_otherwise` exige que cada bloqueante conste como corregido en la evaluación y en la comprobación.
+  - Estado: **corregida** en `2eeeba6`: `evaluation.md` está en la tupla y la prueba `test_the_evaluation_and_its_check_are_recorded_as_done_and_no_document_says_otherwise` exige que cada bloqueante conste como corregido en la evaluación y en la comprobación.
 
 ## Comprobación (L88)
 
@@ -258,4 +258,4 @@ La comprobación (L88) no encontró ningún bloqueante nuevo. Dejó una adverten
 - **N1**
   - Hallazgo: D49 dice que las revisiones nativas dejaron «veintitrés hallazgos», y este archivo, el registro y `docs/evaluation.md` cuentan 24 (hasta L84).
   - Ubicación: `docs/decisions.md` (D49, «Contexto»).
-  - Estado: **corregida** en `0000000`: D49 lleva una nota fechada que dice que son 24 (y 33 con los de L87), y una prueba la fija.
+  - Estado: **corregida** en `2eeeba6`: D49 lleva una nota fechada que dice que son 24 (y 33 con los de L87), y una prueba la fija.
