@@ -96,7 +96,7 @@ Estados: **vigente**, **pendiente del dueño**, **reemplazada por Dxx**.
 - **Motivo**: (c) controla lo que (a) controla (producto, tienda, hora) y además el día de la semana, los feriados, el cambio de nivel y los choques comunes de cada grupo, sin ajustar 1,2 millones de efectos fijos con una matriz (lo que (b) necesitaría y statsmodels no maneja a esta escala **[Inferido]**); el IPF es el estimador de máxima verosimilitud de ese modelo y se escribe con NumPy en unas decenas de líneas; (d) es para una serie tratada, no para 35.000. No controla la razón por la que se lanzó la promoción (si se esperaba más demanda), y eso se dice.
 - **Afecta**: `effect.py`; `fact_*_effect`; el sitio (filas 8 y 9); D32.
 - **Quién**: agente de planificación.
-- **Estado**: vigente.
+- **Estado**: vigente. **Nota del 2026-11-17 (U08)**: `effect.day_factor` (el `b` de un día nuevo con `a` fijo) suma en el numerador solo las series que tienen `a`, como el denominador; `research/plan/p04_effect.py` sumaba también las series sin día `regular` en el período de ajuste (4.254 en el entrenamiento real) en el numerador y no en el denominador, lo que infla el `b` de su grupo en la réplica y en la prueba. Las cifras de réplica y de pronóstico de `p04` y `p05` pueden diferir por eso. El remuestreo toma como población los días del bloque que se evalúa (no los 90 del arreglo, como `p04`).
 
 ## D10 El aumento: observado sobre contrafactual, en las horas de 06 a 21, en dos versiones
 
@@ -346,7 +346,7 @@ Estados: **vigente**, **pendiente del dueño**, **reemplazada por Dxx**.
 - **Motivo**: es la única forma de probar que el estimador puede encontrar un efecto conocido y que la recuperación corrige en el sentido correcto bajo la censura real.
 - **Afecta**: `tests/fixtures/make_fixture.py`; AC15.
 - **Quién**: agente de planificación.
-- **Estado**: vigente.
+- **Estado**: vigente. **Nota del 2026-11-17 (U08, con el accesorio de 300 series, `tests/integration/test_controls.py`)**: el control positivo no se cumple como lo dice el plan para la demanda **recuperada**. Con la demanda verdadera puesta en las horas sin stock (el oráculo), el intervalo de dos vías del total (+47,1 % [+44,5; +49,7] frente a +47,9 % de la verdad) y el de cada una de las siete bandas contienen el aumento plantado: el estimador (IPF, registros y pesos) encuentra un efecto conocido. Con la recuperación R2 (κ = 0,25) el total es +43,8 % [+41,0; +46,1], por debajo de la verdad y fuera del intervalo, y el crudo +26,4 % [+23,2; +29,5]: la recuperación cierra el 81 % de la distancia entre el crudo y la verdad y en cada banda queda más cerca de la verdad que el crudo, pero sigue baja en las bandas profundas (+90,6 % frente a +120,4 % en la banda 0). Es el límite que D07 anunció: R2 aprende el nivel de la serie de las horas que tuvieron stock, que son las de los días de menos demanda, y los quiebres de este accesorio llegan en los días de más demanda. La prueba exige lo que sí se cumple (el oráculo contiene la verdad, crudo < recuperado < verdad, la recuperación cierra más del 70 % de la distancia y queda más cerca en cada banda) y el resumen debe decir que el aumento recuperado es una cota inferior del que escondían los quiebres, no una corrección exacta. El control negativo se cumple en las tres versiones (el intervalo del total y de cada banda contiene 0).
 
 ## D35 Salidas para Power BI y diseño del tablero en HTML
 
