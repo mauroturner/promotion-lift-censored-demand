@@ -446,3 +446,28 @@ def rendered_html(star_export, tmp_path_factory: pytest.TempPathFactory):
 
     path = render_design(MODEL, star_export.out, tmp_path_factory.mktemp("design") / "powerbi-design.html", star_export.run)
     return SimpleNamespace(path=path, html=path.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="session")
+def site_files(star_export, tmp_path_factory: pytest.TempPathFactory):
+    """The five site files written once from the exported star model (the sealed test week): ``out``, ``paths`` and ``site`` (what ``read_site`` verified)."""
+    from types import SimpleNamespace
+
+    from promolift.site_export import export_site, read_site
+    from promolift.warehouse import connect
+
+    out = tmp_path_factory.mktemp("site") / "site"
+    conn = connect(star_export.db)
+    try:
+        paths = export_site(conn, out, star_export.run, star_export.view, seal_path=star_export.seal, max_total_bytes=star_export.cfg.site.max_total_bytes)
+    finally:
+        conn.close()
+    return SimpleNamespace(out=out, paths=paths, site=read_site(out))
+
+
+@pytest.fixture(scope="session")
+def figures_written_for_bytes(site_files, tmp_path_factory: pytest.TempPathFactory):
+    """The nine figures drawn once from the site files: the paths of the PNG files."""
+    from promolift.figures import write_figures
+
+    return write_figures(site_files.out, tmp_path_factory.mktemp("figures_bytes"))
