@@ -1,0 +1,193 @@
+# Airflow 3.4.0 with the LocalExecutor, from the official docker-compose.yaml of that version
+# (https://airflow.apache.org/docs/apache-airflow/3.4.0/docker-compose.yaml), as project 03 corrected it and project 05 adapted it, with these changes (D24):
+#   - LocalExecutor: no redis, no celery worker and no flower (less memory; one task at a time anyway);
+#   - build the image of Dockerfile (Airflow plus the libraries of the pipeline, with the same == pins as the command line) from the project
+#     folder instead of using the plain one; only the airflow-init service has the `build` key (see there);
+#   - the DAGs, the plugins and the initialization script are mounted read-only (./dags, ./plugins, ./init.sh): no task can rewrite the file
+#     that defines the next one, nor drop code that Airflow would load; ./logs and ./config stay writable because Airflow writes them (the
+#     logs, and the airflow.cfg it creates in the folder of AIRFLOW_CONFIG when it is missing; project 03, D80);
+#   - the project is mounted at /opt/promolift piece by piece: src/, sql/ and config/ read-only, data/ read-write except data/raw/ (the owner puts
+#     the two Parquet files there; no task writes them), and outputs/, reports/ and dashboard/ read-write;
+#     the pipeline reads it through PYTHONPATH, PROMOLIFT_HOME and PROMOLIFT_CONFIG;
+#   - the interface is published on 127.0.0.1 only, and every secret has no default and comes from the environment: the password of the
+#     metadata database (in the PostgreSQL service and in the connection string of every Airflow service), the Fernet key, the JWT secret and
+#     the admin password. The file refuses to start until airflow/.env (or the environment) sets each one;
+#   - the external images are pinned by version and by digest, the same ones as projects 04 and 05;
+#   - the example DAGs are off.
+# To run it: copy .env.example to .env and fill the four secrets (the file says how), then `docker compose build`, `docker compose up
+# airflow-init` and `docker compose up -d`; the interface is http://localhost:8080 (user airflow, the password you set). The pipeline needs
+# memory: RNF03 allows its working set a peak of 12 GB, so Docker needs at least 12 GB for its containers (Docker Desktop: Settings, Resources;
+# the Docker Desktop of the machine that built this reported 31 GiB, and the measured peak of the real run is U19's, docs/runbook.md, R10).
+# The quick mode runs inside the container too: PROMOLIFT_CONFIG=/opt/promolift/config/pipeline.quick.toml and the fixture in data/quick/
+# (docs/runbook.md, R10). A relative path of a configuration resolves against /opt/promolift (PROMOLIFT_HOME).
+
+# A project name of its own: the volume and the network never share a name with another Airflow compose project of this machine.
+name: promolift-airflow
+
+x-airflow-common:
+  &airflow-common
+  image: promolift-airflow:3.4.0
+  env_file:
+    - ${ENV_FILE_PATH:-.env}
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg://airflow:${PROMOLIFT_DB_PASSWORD:?set PROMOLIFT_DB_PASSWORD in airflow/.env (see .env.example)}@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ${PROMOLIFT_FERNET_KEY:?set PROMOLIFT_FERNET_KEY in airflow/.env (see .env.example)}
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: 'http://airflow-apiserver:8080/execution/'
+    AIRFLOW__API_AUTH__JWT_SECRET: ${PROMOLIFT_JWT_SECRET:?set PROMOLIFT_JWT_SECRET in airflow/.env (see .env.example)}
+    AIRFLOW__API_AUTH__JWT_ISSUER: ${AIRFLOW__API_AUTH__JWT_ISSUER:-airflow}
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
+    PYTHONPATH: /opt/promolift/src
+    PROMOLIFT_HOME: /opt/promolift
+    PROMOLIFT_CONFIG: ${PROMOLIFT_CONFIG:-/opt/promolift/config/pipeline.toml}
+  volumes:
+    - ./dags:/opt/airflow/dags:ro
+    - ./logs:/opt/airflow/logs
+    - ./config:/opt/airflow/config
+    - ./plugins:/opt/airflow/plugins:ro
+    - ./init.sh:/opt/airflow/init.sh:ro
+    - ../src:/opt/promolift/src:ro
+    - ../sql:/opt/promolift/sql:ro
+    - ../config:/opt/promolift/config:ro
+    - ../data:/opt/promolift/data
+    - ../data/raw:/opt/promolift/data/raw:ro
+    - ../outputs:/opt/promolift/outputs
+    - ../reports:/opt/promolift/reports
+    - ../dashboard:/opt/promolift/dashboard
+  # The user of every Airflow container. On Linux, set AIRFLOW_UID in airflow/.env to your own id (`id -u`): the folders the bind mounts
+  # create (logs, config, plugins) then belong to you and not to the uid 50000, which you could not delete or edit afterwards. Docker
+  # Desktop on Windows and macOS maps the files to your user and does not need it (runbook R10; project 03, D80).
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on:
+    &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16.9@sha256:ddfe3e8713e3ee5b8f286082cb12512488dfbf3f5a1ecb0b74a42e6055af0a5f
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${PROMOLIFT_DB_PASSWORD:?set PROMOLIFT_DB_PASSWORD in airflow/.env (see .env.example)}
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
+
+  airflow-apiserver:
+    <<: *airflow-common
+    command: api-server
+    ports:
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type SchedulerJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type DagProcessorJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-triggerer:
+    <<: *airflow-common
+    command: triggerer
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-init:
+    <<: *airflow-common
+    # The only service that builds the image (the others use its tag): five services building the same tag at once fail on a cold cache
+    # with `image ... already exists` (project 03, D74).
+    build:
+      context: ..
+      dockerfile: airflow/Dockerfile
+    # The other services start only when this one exits 0, so init.sh stops at its first failed command (`set -euo pipefail`). The script is
+    # read without carriage returns, so a Windows checkout that turned its line ends into CRLF still runs, and the pipe fails if the file is
+    # missing (pipefail).
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - "set -o pipefail; tr -d '\\r' < /opt/airflow/init.sh | /bin/bash -s"
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${PROMOLIFT_ADMIN_PASSWORD:?set PROMOLIFT_ADMIN_PASSWORD in airflow/.env (see .env.example)}
+    user: "0:0"
+
+  # `docker compose --profile debug run --rm airflow-cli airflow dags test promolift_daily`
+  # `airflow dags test` runs the DAG in this container, outside the scheduler and so outside its max_active_runs=1 and max_active_tasks=1:
+  # next to a scheduler that is running the daily run there would be two writers of the SQLite warehouse in ../data. Every task holds the
+  # writer lock ../data/interim/pipeline.lock while it runs, so a task of one is refused while a task of the other is running (D26),
+  # but between two tasks of the scheduler's run nobody holds it. Run it with the scheduler stopped (`docker compose stop airflow-scheduler`,
+  # and `docker compose start airflow-scheduler` after); ../data stays writable here because `dags test` writes the warehouse (runbook R8;
+  # project 03, D80 and D82).
+  airflow-cli:
+    <<: *airflow-common
+    profiles:
+      - debug
+    environment:
+      <<: *airflow-common-env
+      CONNECTION_CHECK_MAX_COUNT: "0"
+    command:
+      - bash
+      - -c
+      - airflow
+    depends_on:
+      <<: *airflow-common-depends-on
+
+volumes:
+  postgres-db-volume:
