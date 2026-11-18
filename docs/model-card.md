@@ -98,30 +98,30 @@ Remuestreo de dos vías (D12): pesos de series enteras y de días enteros, con e
 
 ## Ranking
 
-Las celdas con al menos 30 series (grupo × banda) se ordenan por su aumento recuperado y se reparten en grupos indistinguibles: dos celdas cuyos intervalos se pisan comparten grupo (D13). Con los 90 días, 7 grupos de gestión y siete bandas dan 49 celdas, 47 con series-días y 43 ordenadas, en 5 grupos indistinguibles. La semana de prueba repite el orden (C05: Spearman 0,897 sobre 36 celdas, las que tienen 30 series en los dos períodos) y no el nivel (C06: el intervalo de la diferencia contiene 0 en el 58,3 % de las celdas).
+Las celdas con al menos 30 series (grupo × banda) se ordenan por su aumento recuperado y se reparten en grupos indistinguibles: las celdas unidas por intervalos que se pisan, directamente o por una cadena de celdas, comparten grupo (los componentes conexos del grafo de solapes, RF15, D45). Con los 90 días, 7 grupos de gestión y siete bandas dan 49 celdas, 47 con series-días y 43 ordenadas, en **3 grupos indistinguibles** (de 1, 33 y 9 celdas); en la semana de prueba (recuperado), las 36 celdas son un solo grupo. **El sello guarda otros grupos** (5 en el lanzamiento y 2 en la prueba), armados con un recorrido que comparaba cada celda solo con el grupo abierto y dejaba en grupos distintos celdas que se pisan (B1 de la evaluación): se publican al lado como «grupo sellado» y no se reescriben, porque el sello no se reescribe (D17). Los componentes son un análisis posterior al sello sobre los intervalos sellados; ningún aumento, intervalo ni criterio cambia. La semana de prueba repite el orden (C05: Spearman 0,897 sobre 36 celdas, las que tienen 30 series en los dos períodos) y no el nivel (C06: el intervalo de la diferencia contiene 0 en el 58,3 % de las celdas).
 
 ## Criterios y resultados
 
-Diez criterios fijados antes de construir (`docs/requirements.md`, sección 8.1; D16), con lo que se esperaba dicho antes de medir: que C06 y C09 probablemente no se cumplirían. Las dos últimas columnas dicen qué se había visto antes de fijarlos. Los veredictos están tal como los escribe el flujo.
+Diez criterios fijados antes de construir (`docs/requirements.md`, sección 8.1; D16), con lo que se esperaba dicho antes de medir: que C06 y C09 probablemente no se cumplirían. La tercera columna es la cifra que el umbral compara: el límite del intervalo de la diferencia, en puntos, en C01, C04, C08 y C09, y el valor en los demás (A2 de la evaluación, D49). Las dos últimas columnas dicen qué se había visto antes de fijarlos. Los veredictos están tal como los escribe el flujo, y como quedaron en el sello.
 
-| Criterio | Umbral | Valor | Cumple | Veredicto | Visto por la investigación | Visto por el planificador |
+| Criterio | Umbral | Lo que prueba el umbral | Cumple | Veredicto | Visto por la investigación | Visto por el planificador |
 | --- | --- | ---: | --- | --- | --- | --- |
-| La recuperación supera a la media simple | límite superior del intervalo del 95 % de WAPE por serie (recuperación) − WAPE por serie (R1) < 0, en la máscara de cola de la prueba | 0,311 | sí | La recuperación (R2 con κ = 0,25) supera a la media simple (R1) en la máscara de cola de la prueba: WAPE por serie 31,1 % frente a 35,6 %; la diferencia va de −4,69 a −4,25 puntos. | no | sí |
+| La recuperación supera a la media simple | límite superior del intervalo del 95 % de WAPE por serie (recuperación) − WAPE por serie (R1) < 0, en la máscara de cola de la prueba | −4,25 puntos | sí | La recuperación (R2 con κ = 0,25) supera a la media simple (R1) en la máscara de cola de la prueba: WAPE por serie 31,1 % frente a 35,6 %; la diferencia va de −4,69 a −4,25 puntos. | no | sí |
 | La masa recuperada no tiene sesgo grande | \|sesgo de la recuperación\| ≤ 0,10 en la máscara de cola de la prueba | −0,002 | sí | El sesgo de la masa recuperada cumple: la recuperación estima 0,2 % de menos y se pedía a lo sumo 10,0 %. | no | sí |
 | La recuperación no cambia el aumento | \|(1 + sesgo en días con promoción) / (1 + sesgo en días regulares) − 1\| ≤ 0,05 en la máscara de cola de la prueba | −0,038 | sí | La recuperación no cambia el aumento: el sesgo en días con promoción frente al de los días regulares lo mueve 3,8 %, y se pedía a lo sumo 5,0 %. | no | en parte |
-| Los quiebres esconden parte del efecto | límite inferior del intervalo del 95 % del aumento total recuperado − el crudo, en la prueba, > 0 | 0,479 | no | Los quiebres no esconden parte del efecto: el aumento total con la demanda recuperada es 47,9 % frente a 46,5 % con la venta cruda; la diferencia va de −1,81 a 4,36 puntos. | sí | sí |
+| Los quiebres esconden parte del efecto | límite inferior del intervalo del 95 % del aumento total recuperado − el crudo, en la prueba, > 0 | −1,81 puntos | no | Los quiebres no esconden parte del efecto: el aumento total con la demanda recuperada es 47,9 % frente a 46,5 % con la venta cruda; la diferencia va de −1,81 a 4,36 puntos. | sí | sí |
 | El orden de las celdas se repite | correlación de Spearman entre los aumentos sellados y los de la prueba, en las celdas con series suficientes en las dos, ≥ 0,80 | 0,897 | sí | El orden de las celdas se repite en la semana de prueba: correlación de Spearman 0,897 entre el aumento sellado y el de la prueba, sobre 36 celdas, y se pedía al menos 0,80. | no | sí |
 | El nivel de cada celda se repite | proporción de esas celdas cuyo intervalo de la diferencia prueba − sellado contiene 0 ≥ 0,80 | 0,583 | no | El nivel de cada celda no se repite: el intervalo de la diferencia prueba − sellado contiene 0 en el 58,3 % de 36 celdas, y se pedía al menos 80,0 %. | no | sí |
 | Más descuento, más aumento | correlación de Spearman entre la profundidad de la banda y su aumento en la prueba ≥ 0,90 | 1,000 | sí | Más descuento, más aumento: correlación de Spearman 1,000 entre la profundidad de la banda y su aumento en la prueba, y se pedía al menos 0,90. | sí | sí |
-| El aumento de la celda mejora el pronóstico | límite superior del intervalo del 95 % de WAPE(F2) − WAPE(F2a) < 0, en las series-días con promoción de la prueba | 0,403 | sí | El aumento de la celda mejora el pronóstico frente a un aumento único (F2a): WAPE de F2 40,3 % frente a 43,9 % de F2a; la diferencia va de −4,07 a −3,19 puntos. | no | sí |
-| El pronóstico con el aumento supera a la regla ingenua | límite superior del intervalo del 95 % de WAPE(F2) − WAPE(F1) < 0, en las mismas series-días | 0,403 | no | El pronóstico con el aumento de la celda no supera a la regla ingenua (F1), la media de los días anteriores de la propia serie: WAPE de F2 40,3 % frente a 35,0 % de F1; la diferencia va de 1,92 a 8,32 puntos. | no | sí |
+| El aumento de la celda mejora el pronóstico | límite superior del intervalo del 95 % de WAPE(F2) − WAPE(F2a) < 0, en las series-días con promoción de la prueba | −3,19 puntos | sí | El aumento de la celda mejora el pronóstico frente a un aumento único (F2a): WAPE de F2 40,3 % frente a 43,9 % de F2a; la diferencia va de −4,07 a −3,19 puntos. | no | sí |
+| El pronóstico con el aumento supera a la regla ingenua | límite superior del intervalo del 95 % de WAPE(F2) − WAPE(F1) < 0, en las mismas series-días | 8,32 puntos | no | El pronóstico con el aumento de la celda no supera a la regla ingenua (F1), la media de los días anteriores de la propia serie: WAPE de F2 40,3 % frente a 35,0 % de F1; la diferencia va de 1,92 a 8,32 puntos. | no | sí |
 | Variantes y seguimiento (informativo) | sin umbral: que esté escrito y sea consistente | sin dato | informativo | Informativo, sin umbral: se escribieron 257 cifras de variantes y el seguimiento de 7 días de la prueba. | en parte | sí, en el entrenamiento y la validación |
 
 De los nueve criterios con umbral, seis se cumplen y tres no (C04, C06 y C09). Por criterio:
 
 - **C01 se cumple:** la recuperación (R2 con κ = 0,25) tiene un WAPE por serie de 31,1 % frente a 35,6 % de la media simple (R1); la diferencia va de −4,69 a −4,25 puntos.
 - **C02 y C03 se cumplen:** el sesgo es de −0,2 % y la recuperación mueve el aumento 3,8 % (sesgo de −2,5 % en días con promoción y de +1,4 % en días regulares).
-- **C04 no se cumple, y se esperaba que sí:** el aumento total recuperado es +47,9 % y el crudo +46,5 %; la diferencia es de +1,37 puntos y va de −1,81 a +4,36, así que el límite inferior no pasa de 0. El planificador midió +4,20 puntos en el entrenamiento ([+2,73; +5,76]); con los 90 días del lanzamiento la diferencia es de +0,9 puntos.
+- **C04 no se cumple, y se esperaba que sí:** el aumento total recuperado es +47,9 % y el crudo +46,5 %; la diferencia es de +1,37 puntos y va de −1,81 a +4,36, así que el límite inferior no pasa de 0: la diferencia no se distingue de 0, lo que no prueba que los quiebres no escondan nada (la frase sellada dice «no esconden»; A1 de la evaluación). El planificador midió +4,20 puntos en el entrenamiento ([+2,73; +5,76]); con los 90 días del lanzamiento la diferencia es de +0,9 puntos.
 - **C05 y C07 se cumplen:** Spearman 0,897 entre los aumentos sellados y los de la prueba, y 1,000 entre la profundidad de la banda y su aumento.
 - **C06 no se cumple (esperado):** el 58,3 % de las 36 celdas mantiene su nivel y se pedía el 80 %.
 - **C08 se cumple:** el aumento de la celda mejora el pronóstico frente a un aumento único (F2 40,3 % frente a 43,9 % de F2a); la diferencia va de −4,07 a −3,19 puntos.
@@ -148,25 +148,26 @@ Réplica del entrenamiento en la validación (18 días, `fit_blocks = train`, 40
 - **El aumento es una asociación, no es causal**, y su nivel depende de la ventana de ajuste.
 - **La semana de prueba es una sola semana:** 7 días, 103.629 series-días con promoción y 36 celdas comparables; C06 y C09 se midieron una vez.
 - **La cifra del artículo** (1,43 veces de mediana por serie) usa otra definición y no se compara con la de este proyecto (D37).
-- **El tiempo de la corrida diaria no se cumple (RNF02, abierto).** Las siete corridas diarias tardan de 62 a 68 s y el límite es 60 s; su prueba, `tests/e2e/test_real.py::test_every_daily_run_takes_at_most_the_required_seconds`, está en rojo a propósito. Es un requerimiento no cumplido que se corrige después de la evaluación independiente.
-- **Sin evaluación independiente todavía, y sin `.pbix`.** La evaluación independiente, las correcciones de las advertencias de las revisiones (`docs/review-advisories.md`) y el `.pbix` están pendientes.
+- **El tiempo de la corrida diaria no se cumplía en la corrida real (RNF02).** Las siete corridas diarias tardaron de 62 a 68 s contra un límite de 60 s; después de su corrección (D46) tardaron de 42 a 44 s en una repetición real sobre una copia, y `tests/e2e/test_real.py::test_every_daily_run_takes_at_most_the_required_seconds` pasó.
+- **Los grupos indistinguibles del sello no son los de RF15** (B1 de la evaluación): se publican los componentes conexos al lado, como análisis posterior al sello (D45).
+- **Sin la comprobación de las correcciones todavía, y sin `.pbix`.** La evaluación independiente se hizo (`docs/evaluation.md`); la comprobación de sus correcciones y el `.pbix` están pendientes.
 
 ## Tiempos y memoria
 
-Medidos en la repetición real completa (una sola, `replay`, en un solo proceso, con el equipo de desarrollo; D29, D39):
+Medidos en la repetición real completa (`replay`, en un solo proceso, con el equipo de desarrollo; D29, D39): la corrida real de U19 y, después de la corrección de RNF02 (D46), una repetición del código corregido sobre una copia de los datos, fuera del repositorio, con el sello igual byte a byte:
 
-| Qué | Tiempo | Requerimiento | Se cumple |
-| --- | ---: | --- | --- |
-| Repetición completa con la corrida sin entrega | 876 s (14,6 min) | ≤ 20 min | sí |
-| Lanzamiento | 310 s | ≤ 12 min | sí |
-| Corridas diarias (siete) | de 62 a 68 s | ≤ 60 s (RNF02) | **no** |
-| Cierre, con la primera evaluación de la prueba | 120 s | sin límite propio | |
-| Corrida sin entrega | 1 s | | |
+| Qué | Corrida real | Después de la corrección | Requerimiento | Se cumple |
+| --- | ---: | ---: | --- | --- |
+| Repetición completa con la corrida sin entrega | 876 s (14,6 min) | 717 s de reloj | ≤ 20 min | sí |
+| Lanzamiento | 310 s | 310 s | ≤ 12 min | sí |
+| Corridas diarias (siete) | de 62 a 68 s | de 42 a 44 s | ≤ 60 s (RNF02) | **no** en la corrida real; **sí** después |
+| Cierre, con la evaluación de la prueba | 120 s | 97 s | sin límite propio | |
+| Corrida sin entrega | 1 s | 1 s | | |
 
-En las corridas diarias, la carga (de 24,6 a 26,3 s) y la exportación (de 31,2 a 35,6 s) suman unos 57 de los 62 a 68 s: reconstruyen todo en cada entrega. La corrección se mide sobre una copia de `data/` y va después de la evaluación independiente.
+En las corridas diarias de la corrida real, la carga (de 24,6 a 26,3 s) y la exportación (de 31,2 a 35,6 s) sumaban unos 57 de los 62 a 68 s: cada una reconstruía entera la preparación de las series-días. Con la preparación extendida (D46), la carga tardó de 14,9 a 16,3 s y la exportación de 21,1 a 22,3 s.
 
-Memoria, con su contador: el pico del conjunto de trabajo de la repetición completa es de 4.077,9 MB de `PeakWorkingSetSize` (`GetProcessMemoryInfo`; el límite de RNF03 es 12 GB de ese contador), y `PeakPagefileUsage`, informativo, de 5.808,7 MB. El pico es el del proceso hasta ese momento y no baja, así que es el mismo en las nueve corridas; lo alcanzó la primera. En la corrida en seco de U09, 90 vistas vivas de un archivo mapeado en memoria habían llevado `PeakWorkingSetSize` a 20,9 GB, y copiar cada día al leerlo lo bajó a 4,3 GB (D22).
+Memoria, con su contador: el pico del conjunto de trabajo de la repetición completa es de 4.077,9 MB de `PeakWorkingSetSize` en la corrida real y de 4.112,6 MB de `PeakWorkingSetSize` en la repetición del código corregido (`GetProcessMemoryInfo`; el límite de RNF03 es 12 GB de ese contador), y `PeakPagefileUsage`, informativo, de 5.808,7 MB y 5.841,2 MB. El pico es el del proceso hasta ese momento y no baja, así que es el mismo en las nueve corridas; lo alcanzó la primera. En la corrida en seco de U09, 90 vistas vivas de un archivo mapeado en memoria habían llevado `PeakWorkingSetSize` a 20,9 GB, y copiar cada día al leerlo lo bajó a 4,3 GB (D22).
 
 ## La suite rápida
 
-La suite por defecto (`pytest -m "not real_data and not docker"`) recoge 857 pruebas. La suite rápida tardó 125,14 s y 125,36 s (dos corridas en reposo) en el equipo de desarrollo, con un límite de 180 s y un presupuesto de trabajo de 150 s (D29; el dueño subió el límite de 120 s a 180 s el 2026-11-18). Una sesión completa que pasa el límite sale con falla y dice por cuánto. Las pruebas con los Parquet reales (`-m real_data`) y con Docker (`-m docker`) están fuera de la selección por defecto: la prueba de tiempo de la corrida diaria es de las primeras y está en rojo (RNF02).
+La suite por defecto (`pytest -m "not real_data and not docker"`) recoge 883 pruebas. La suite rápida tardó 130,99 s y 125,31 s (dos corridas en reposo, con el código y las pruebas del último commit de corrección) en el equipo de desarrollo, con un límite de 180 s y un presupuesto de trabajo de 150 s (D29; el dueño subió el límite de 120 s a 180 s el 2026-11-18). Una sesión completa que pasa el límite sale con falla y dice por cuánto. Las pruebas con los Parquet reales (`-m real_data`) y con Docker (`-m docker`) están fuera de la selección por defecto: la prueba de tiempo de la corrida diaria es de las primeras y pasó en la repetición del código corregido (RNF02).

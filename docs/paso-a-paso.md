@@ -1,6 +1,6 @@
 # Paso a paso: cómo se hizo el proyecto
 
-La cronología real, desde el registro del documento de seguimiento (`odd/tasks/portfolio-projects.md`, L70 a L81) y `git log` de esta carpeta: qué se hizo en cada paso, quién (qué agente y con qué modelo, S8), con qué prueba y en qué commit. Todo lo que dice este documento consta en el registro; una prueba comprueba que cada unidad y cada entrada del registro que nombra existe, y que cada commit que cita está en el historial (`tests/docs/test_docs.py`). La evaluación independiente y sus correcciones no se hicieron todavía y no están aquí.
+La cronología real, desde el registro del documento de seguimiento (`odd/tasks/portfolio-projects.md`, L70 a L85) y `git log` de esta carpeta: qué se hizo en cada paso, quién (qué agente y con qué modelo, S8), con qué prueba y en qué commit. Todo lo que dice este documento consta en el registro; una prueba comprueba que cada unidad y cada entrada del registro que nombra existe, y que cada commit que cita está en el historial (`tests/docs/test_docs.py`). La evaluación independiente y sus correcciones no se hicieron todavía y no están aquí.
 
 El dueño del proyecto pidió que cuando se termina un proyecto se siga con el siguiente sin preguntar (S12), que la estructura sea la del proyecto 01 (S10), que se acepten de forma automática las revisiones de Gentle AI (S11) y los modelos de los agentes: Opus para planes, arquitectura y evaluación, Sonnet para programar y Haiku para tareas acotadas como investigar (S8).
 
@@ -45,6 +45,8 @@ Agentes con Sonnet escribieron U01 a U19, cada unidad con su prueba primero (se 
 | U17 | La línea de comandos y el modo rápido aislado | `936200c` | L79 |
 | U18 | El DAG `promolift_daily`, Docker y el compose con todos los secretos del entorno | `593ffc8` | L79 |
 | U19 | La corrida real completa y la primera lectura de la semana de prueba | `6253c31` | L81 |
+| U20 | El README y la ficha del modelo, desde el resumen sellado | `4ad3f14` | L83 |
+| U21 | El diccionario, el runbook, este paso a paso y las advertencias de las revisiones | `8585877` | L83 |
 
 **Commits que no son una unidad.**
 
@@ -57,18 +59,34 @@ Agentes con Sonnet escribieron U01 a U19, cada unidad con su prueba primero (se 
 
 **Dos hechos de los datos reales que cambiaron una decisión durante la construcción** (L73, L75). La columna `discount` guarda el mismo descuento de dos maneras (el double que se quiso y su vecino de float32) en 3.338 filas, de modo que los bordes de las bandas usan una tolerancia de 10⁻⁶ (D13). Y 90 vistas vivas de un archivo mapeado en memoria llevaron el conjunto de trabajo de la corrida en seco a 20,9 GB (`PeakWorkingSetSize`): copiar cada día al leerlo lo bajó a 4,3 GB (D22).
 
-## 4. Las revisiones nativas (L74, L76, L78, L80)
+## 4. Las revisiones nativas (L74, L76, L78, L80, L82, L84)
 
-La revisión nativa de Gentle AI revisó la investigación, U01 a U18 y los tramos de documentos que alcanzó, cada unidad de riesgo alto sola y el resto en tramos, con el consentimiento aceptado de forma automática (S11). Aprobó todo lo que revisó, con 20 hallazgos entre sugerencias y advertencias, que `docs/review-advisories.md` lista con su ubicación y su estado. Un tramo de documentos no tenía riesgo para revisar (L74), otro superó el presupuesto de contexto de una revisión (L74), y la revisión de U19 todavía no consta en el registro.
+La revisión nativa de Gentle AI revisó la investigación, U01 a U18, U20, U21 y los tramos de documentos que alcanzó, cada unidad de riesgo alto sola y el resto en tramos, con el consentimiento aceptado de forma automática (S11). Aprobó todo lo que revisó, con 24 hallazgos entre sugerencias, advertencias y uno marcado crítico, que `docs/review-advisories.md` lista con su ubicación y su estado. Un tramo de documentos no tenía riesgo para revisar (L74) y otro superó el presupuesto de contexto (L74). **U19 no se pudo revisar** (L82): START lo rechazó con `lens_context_budget_exceeded` (9.002 líneas, casi todas salidas generadas) sin crear autoridad, y partirlo habría reescrito la historia confirmada; la evaluación independiente recalculó cada cifra de esas salidas con su propio lector (L85).
 
 ## 5. La corrida real (L81)
 
 Una sola vez, `6253c31`: `replay` sobre los dos Parquet reales (el lanzamiento, siete entregas diarias y el cierre), una corrida sin entrega, y la evaluación de la semana de prueba bajo el sello. Seis de los nueve criterios con umbral se cumplen; C06 y C09 no, como se esperaba; **C04 no, aunque se esperaba que sí** (+1,37 puntos, de −1,81 a +4,36). La repetición completa tardó 876 s; las siete corridas diarias tardan de 62 a 68 s contra un límite de 60 s, y su prueba está en rojo a propósito (RNF02). El orquestador comprobó que los valores del resumen coinciden con el informe, y avisó al dueño por Telegram.
 
-## 6. La documentación
+## 6. La documentación (L83)
 
-El README y la ficha del modelo (`4ad3f14`) y el diccionario, el runbook, este paso a paso y las advertencias de las revisiones, escritos por un agente con Sonnet con la prueba primero: cada prueba nombrada se vio fallar contra el documento que faltaba antes de escribirlo. Las cifras de las tablas salen de los archivos sellados y del resumen; `docs-sync` aprendió a escribir las tablas del diccionario desde el modelo semántico (D44). La entrada del registro de esta documentación la escribe el orquestador después de ella, y esta página se sincroniza otra vez entonces.
+U20, el README y la ficha del modelo (`4ad3f14`), y U21, el diccionario, el runbook, este paso a paso y las advertencias de las revisiones (`8585877`), escritos por un agente con Sonnet con la prueba primero: cada prueba nombrada se vio fallar contra el documento que faltaba antes de escribirlo. Las cifras de las tablas salen de los archivos sellados y del resumen; `docs-sync` aprendió a escribir las tablas del diccionario desde el modelo semántico (D44).
+
+## 7. La evaluación independiente (L85)
+
+Un agente con Opus que no construyó el proyecto evaluó `b15055c` en solo lectura, en un clon aparte con su propio entorno, con un lector propio de los Parquet que no importa `promolift`. Cada cifra recalculada coincide a 10⁻⁹ o mejor, y su repetición real reprodujo el sello. Encontró cuatro bloqueantes (B1: los grupos indistinguibles separaban celdas que se pisan; B2: `[effect] versions` se ignoraba; B3: esta documentación no reflejaba L82; B4: la corrida diaria pasaba de 60 s) y nueve advertencias. Su informe está en [evaluation.md](evaluation.md).
+
+## 8. Las correcciones
+
+Un agente con Opus, con la prueba primero, una corrección de riesgo alto por commit:
+
+- `9c6e964` **B1** (ítem 1; D45): los grupos indistinguibles son los componentes conexos del grafo de solapes, publicados al lado del grupo sellado como análisis posterior al sello; el sello no cambia.
+- `6eb7c68` **B2** (ítem 3; D47): `[effect] versions` acepta solo `["raw", "recovered"]`.
+- `8ef2a3e` **B4** (ítem 1; D46): la preparación de las series-días se extiende en lugar de reconstruirse dos veces por entrega.
+- `75456e7` **A6** (ítem 4; D48): el bloqueo quita las carpetas vacías que creó.
+- `8b73512` **A2, A5, A8 y las advertencias de las revisiones que tocan el código** (D49).
+- `a5f6ebd` las pruebas de las tablas de la ficha y de la forma de todas las tablas de la documentación.
+- La repetición real sobre una copia, las salidas versionadas que cambian por diseño y esta documentación, en los commits que siguen.
 
 ## Lo que falta
 
-La evaluación independiente de un agente con Opus que no construyó el proyecto, las correcciones de lo que encuentre (entre ellas, el tiempo de la corrida diaria y las advertencias abiertas), la comprobación de las correcciones, la revisión nativa de U19, la página del sitio y el `.pbix`, que arma a mano quien tenga Power BI Desktop.
+La comprobación de las correcciones por otro agente con Opus, la página del sitio y el `.pbix`, que arma a mano quien tenga Power BI Desktop.

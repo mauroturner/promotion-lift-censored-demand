@@ -110,9 +110,10 @@ def test_the_model_card_has_the_contents_of_the_plan_and_says_the_unfavourable_v
 
 
 def test_the_readme_says_what_is_pending_and_gives_the_attribution(readme: str, model_card: str) -> None:
-    """RNF14: the independent evaluation, the corrections and the ``.pbix`` are not done and the README says so; the credit of the source is complete; nothing local is published."""
+    """RNF14: the independent evaluation is done (L85) and the check of its corrections and the ``.pbix`` are not, and the README says so; the credit of the source is
+    complete; nothing local is published."""
     text = readme.lower()
-    assert "evaluación independiente" in text and "todavía no" in text and ".pbix" in text and "RNF02" in readme
+    assert "evaluación independiente" in text and "comprobación" in text and "todavía no" in text and ".pbix" in text and "RNF02" in readme
     tail = section(readme, "Fuente y licencia")
     for piece in (
         "Dingdong-Inc", "FreshRetailNet-50K", "CC BY 4.0", "c374e859", "Wang et al. (2026)", "arXiv:2505.16319",
@@ -207,7 +208,7 @@ MEMORY_WORDS = re.compile(r"pico|peak_|conjunto de trabajo|comprometid|memoria",
 SENTENCE_END = re.compile(r"(?<=\.)\s+")
 LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)#\s]+)(?:#[^)]*)?\)")
 IMAGE = re.compile(r"!\[[^\]]*\]\(([^)\s]+)\)")
-UNITS_DONE = [f"U{n:02d}" for n in range(1, 20)]   # U01 to U19 have their entry in the log; the two units of documentation are logged after this documentation
+UNITS_DONE = [f"U{n:02d}" for n in range(1, 22)]   # U01 to U21 have their entry in the log (U20 and U21 in L83)
 STATUSES = ("corregida", "refutada", "dejada con evidencia", "abierta")
 DOCS = ("data-dictionary.md", "runbook.md", "paso-a-paso.md", "review-advisories.md", "decisions.md")   # evaluation.md joins them when the independent evaluation exists
 LOCAL_PATH = re.compile(r"[A-Za-z]:[\\/]+(?:Users|Documents and Settings)|/c/Users|Users\\|/home/\w+/")
@@ -328,7 +329,7 @@ def test_every_unit_the_docs_tell_has_its_log_entry(project_root: Path, readme: 
     cited = {name: {int(n) for n in re.findall(r"\bL(\d{2,3})\b", text)} for name, text in documents.items()}
     assert [(name, sorted(numbers - set(entries))) for name, numbers in cited.items() if numbers - set(entries)] == []   # no entry that the log does not have
     assert set(UNITS_DONE) <= told["docs/paso-a-paso.md"]   # the step by step names every unit the log has
-    assert set(range(70, 82)) <= cited["docs/paso-a-paso.md"]   # and every entry of the project so far
+    assert set(range(70, 86)) <= cited["docs/paso-a-paso.md"]   # and every entry of the project so far
 
 
 def test_the_dictionary_covers_the_source_and_its_tables_are_the_generated_ones(project_root: Path) -> None:
@@ -493,18 +494,22 @@ def advisories(text: str) -> dict[tuple[str, str], str]:
 
 
 def test_open_advisories_match_review_file(project_root: Path, readme: str) -> None:
-    """AC37 and B5 of project 03's evaluation: every advisory of every native review (L74, L76, L78 and L80: 20 in all) has its location and its status in
-    ``docs/review-advisories.md`` (corrected, with its commit; refuted or left with evidence; or open), and the advisories the README calls open are the ones that file calls open."""
+    """AC37 and B5 of project 03's evaluation: every advisory of every native review (L74, L76, L78, L80, L82 and L84: 24 in all) has its location and its status in
+    ``docs/review-advisories.md`` (corrected, with its commit; refuted or left with evidence, with the reason; or open), and the advisories the README calls open are the ones
+    that file calls open. After the corrections that followed the evaluation (plan, section 28), none is open."""
     text = read(project_root, "review-advisories.md")
     found = advisories(text)
-    assert len(found) == 20 and [key for key, status in found.items() if status not in STATUSES] == []
+    assert len(found) == 24 and [key for key, status in found.items() if status not in STATUSES] == []
     blocks = [block for block in re.split(r"^(?=- \*\*)", text, flags=re.MULTILINE) if block.startswith("- **")]
     assert all(re.search(r"^  - Ubicación: .+", block, flags=re.MULTILINE) for block in blocks)   # where each one is
     fixed = [block for block in blocks if "Estado: **corregida**" in block]
-    assert len(fixed) == 1 and all(re.search(r"`[0-9a-f]{7}`", block.split("Estado: **corregida**")[1].splitlines()[0]) for block in fixed)   # U13's preview keys: f553c1e (L81)
+    assert len(fixed) == 13 and all(re.search(r"`[0-9a-f]{7}`", block.split("Estado: **corregida**")[1].splitlines()[0]) for block in fixed)   # each with its commit
+    left = [block for block in blocks if re.search(r"Estado: \*\*(dejada con evidencia|refutada)\*\*\. \S", block)]
+    assert len(left) == 11, "every finding left as it is or refuted says why"
     opened = sorted(f"{key}/{ident}" for (key, ident), status in found.items() if status == "abierta")
     [stated] = re.findall(r"^Advertencias abiertas: (.+)$", readme, flags=re.MULTILINE)
-    assert sorted(re.findall(r"`([^`]+)`", stated)) == opened and len(opened) == 19, stated
+    assert sorted(re.findall(r"`([^`]+)`", stated)) == opened == [] and stated == "ninguna.", stated
+    assert "todavía no consta" not in text and "20 en total" not in text and "L82" in text and "lens_context_budget_exceeded" in text   # B3 of the evaluation
 
 
 def test_the_root_rows_of_project_06_carry_the_real_figures(project_root: Path) -> None:
