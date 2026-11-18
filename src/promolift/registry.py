@@ -8,7 +8,7 @@ Python objects is refused whatever its hash is. R3 does not fit in an array: ``r
 05 reads its pickle: the bytes once, ``hmac.compare_digest`` with the registered hash and only then ``pickle.loads`` of *those* bytes. The hash protects against a file that
 was replaced or damaged, not against someone who rewrites the file and the registry together (D20).
 
-**The seal** (``reports/model_seal.json``) has a launch part (and, from U11, a test part), each written once. ``config_sha256`` is the SHA-256 of the canonical JSON of the
+**The seal** (``reports/model_seal.json``) has a launch part and a test part, each written once. ``config_sha256`` is the SHA-256 of the canonical JSON of the
 whole ``SealedConfig``: every key that can change a sealed value is in it, and the hash of the TOML file is another thing (``config_file_sha256``, project 05's A8) that
 never appears here. A repetition with the sealed configuration must reproduce the sealed values rounded to 6 decimals (``SealMismatchError`` naming each); another
 configuration is ``post_seal`` (M05) and the seal stays as it is.
@@ -75,6 +75,11 @@ class SealError(RuntimeError):
 
 class SealMismatchError(SealError):
     """A repetition with the sealed configuration did not reproduce the sealed values (runbook R7)."""
+
+
+class EvaluationRefusedError(SealError):
+    """The test cannot be evaluated: there is no seal, or another configuration than the sealed one while the seal has no test part (D17). The pipeline turns it
+    into a refused run (exit code 2); nothing was written."""
 
 
 @dataclass(frozen=True)
@@ -298,10 +303,11 @@ SEAL_DECIMALS = 6                     # a repetition must reproduce the sealed v
 SEAL_MODE = 0o600                     # owner only, where the mode is the access control
 LAUNCH_KEYS = ("run_key", "as_of", "train_sha256", "eval_sha256", "config_sha256", "sealed_config", "model_version", "artifact_sha256", "r3_sha256", "recovery", "effects",
                "validation", "validation_digest")
+TEST_KEYS = ("run_key", "as_of", "config_sha256", "criteria", "metrics", "recovery", "effects", "replication", "forecast", "variants", "days")
 # what a repetition may change: the run that computed the values, its instant and the bytes of the files (the values do not depend on them; M03 checks the files
 # against the registry)
 _NOT_COMPARED = ("run_key", "as_of", "artifact_sha256", "r3_sha256")
-_IDENTIFIERS = ("key", "id", "name", "method", "scope", "version", "unit_key", "check")     # what names an entry of a list of objects
+_IDENTIFIERS = ("key", "id", "name", "method", "scope", "version", "unit_key", "check", "variant", "date_key")     # what names an entry of a list of objects
 _NO_HARD_LINKS = frozenset({errno.EPERM, errno.ENOTSUP, errno.EOPNOTSUPP, errno.EXDEV, errno.ENOSYS})
 _WINDOWS_NO_HARD_LINKS = frozenset({1, 50})      # ERROR_INVALID_FUNCTION and ERROR_NOT_SUPPORTED
 _ABSENT = object()
@@ -358,7 +364,32 @@ def read_seal(seal_path: Path) -> dict | None:
     launch = document.get("launch")
     if not isinstance(launch, dict) or set(launch) != set(LAUNCH_KEYS) or not _is_sha256(launch.get("config_sha256")):
         raise SealError(f"la parte del lanzamiento del sello {path.name} no tiene sus claves o su huella")
+    test = document.get("test")
+    if test is not None and (not isinstance(test, dict) or set(test) != set(TEST_KEYS) or not _is_sha256(test.get("config_sha256"))):
+        raise SealError(f"la parte de la prueba del sello {path.name} no tiene sus claves o su huella")
     return document
+
+
+def check_test_evaluation(seal_path: Path, view: SealedConfig) -> Literal["first", "repeat", "post_seal"]:
+    """What evaluating the test with the configuration `view` means, decided **before** anything is written (D17).
+
+    ``first``: the seal has the launch part with this configuration and no test part, so this evaluation is the one that is sealed. ``repeat``: the seal already has
+    its test part with this configuration: the evaluation must reproduce it. ``post_seal``: the test is sealed and this is another configuration: it is computed apart
+    and never replaces the sealed one. With another configuration and **no** test part the evaluation is refused (``EvaluationRefusedError`` naming the keys that
+    differ), and so it is without a seal."""
+    document = read_seal(seal_path)
+    if document is None:
+        raise EvaluationRefusedError("no hay sello: el lanzamiento lo escribe antes de que se evalúe la prueba, y no se evalúa sin él (docs/runbook.md, R7)")
+    config_sha256 = config_fingerprint(view)
+    sealed = document["launch"]["config_sha256"]
+    if document.get("test") is not None:
+        return "repeat" if sealed == config_sha256 else "post_seal"
+    if sealed != config_sha256:
+        keys = differing_keys(document["launch"]["sealed_config"], sealed_document(view))
+        raise EvaluationRefusedError(
+            "la prueba no se evalúa con otra configuración que la sellada mientras el sello no tiene su parte de la prueba: la primera evaluación es la que se sella "
+            f"(D17); las claves que difieren: {', '.join(keys) or '(ninguna que se pueda nombrar)'}. No se escribió nada (docs/runbook.md, R7)")
+    return "first"
 
 
 def seal_state(seal_path: Path, config_sha256: str) -> Literal["none", "match", "post_seal"]:
@@ -419,13 +450,13 @@ def _create_exclusive(path: Path, data: bytes) -> bool:
         Path(name).unlink(missing_ok=True)
 
 
-def _check_part(part: Mapping[str, Any]) -> None:
-    missing, extra = [k for k in LAUNCH_KEYS if k not in part], sorted(set(part) - set(LAUNCH_KEYS))
+def _check_part(part: Mapping[str, Any], keys: tuple[str, ...] = LAUNCH_KEYS, what: str = "del lanzamiento") -> None:
+    missing, extra = [k for k in keys if k not in part], sorted(set(part) - set(keys))
     if missing or extra:
-        raise SealError(f"la parte del lanzamiento debe tener exactamente las claves {list(LAUNCH_KEYS)}; faltan {missing}, sobran {extra}")
+        raise SealError(f"la parte {what} debe tener exactamente las claves {list(keys)}; faltan {missing}, sobran {extra}")
     if not _is_sha256(part["config_sha256"]):
-        raise SealError("config_sha256 de la parte del lanzamiento debe ser un SHA-256 de 64 dígitos hexadecimales")
-    if canonical_sha256(part["sealed_config"]) != part["config_sha256"]:
+        raise SealError(f"config_sha256 de la parte {what} debe ser un SHA-256 de 64 dígitos hexadecimales")
+    if keys is LAUNCH_KEYS and canonical_sha256(part["sealed_config"]) != part["config_sha256"]:
         raise SealError("config_sha256 no es la huella de la configuración sellada de la parte del lanzamiento")
     _rounded(dict(part))                 # refuses a value that is not JSON, or not finite, before anything is compared or written
 
@@ -468,3 +499,34 @@ def write_launch_seal(seal_path: Path, launch: Mapping[str, Any]) -> Literal["wr
         logger.warning("seal: this configuration (%s) is not the sealed one: post_seal; the keys that differ: %s", launch["config_sha256"][:12],
                        ", ".join(differing_keys(read_seal(path)["launch"]["sealed_config"], launch["sealed_config"])))
     return outcome
+
+
+def write_test_seal(seal_path: Path, test: Mapping[str, Any]) -> Literal["written", "unchanged", "post_seal"]:
+    """Add the test part to the seal once. Returns what happened.
+
+    ``written``: the seal had only its launch part, which is kept as it was, and now has `test` too; the file is read back and must say what was written.
+    ``unchanged``: it already has a test part whose values, rounded to 6 decimals, are these. ``post_seal``: `test` was evaluated with another configuration than the
+    sealed one; the seal is left as it is. Any other difference is a ``SealMismatchError`` that names the values: every key that can change a sealed value is in
+    ``config_sha256``, so there is no third case (plan, section 15)."""
+    _check_part(test, TEST_KEYS, "de la prueba")
+    path = Path(seal_path)
+    document = read_seal(path)
+    if document is None:
+        raise SealError("no hay sello: la parte de la prueba se escribe después de la del lanzamiento")
+    if test["config_sha256"] != document["launch"]["config_sha256"]:
+        logger.warning("seal: the test was evaluated with another configuration than the sealed one: post_seal; the seal is left as it is")
+        return "post_seal"
+    if document.get("test") is not None:
+        differ = _differences(document["test"], test)
+        if not differ:
+            return "unchanged"
+        raise SealMismatchError("la evaluación de la prueba con la configuración sellada no reproduce los valores sellados, redondeados a 6 decimales: "
+                                f"{', '.join(differ[:6])}{' y otros' if len(differ) > 6 else ''} (docs/runbook.md, R7)")
+    write_atomic(path, _dump({**document, "test": dict(test)}))
+    # one writer at a time (D26), but the read, the decision and the write are not one step: read it back, and say so if it is not what was written
+    kept = read_seal(path) or {}
+    if kept.get("launch") != document["launch"] or _rounded(kept.get("test")) != _rounded(dict(test)):
+        logger.error("seal: the test part written by run %s is not what the file says (runbook R7)", test["run_key"])
+        raise SealMismatchError("lo que consta en el sello no es lo que esta corrida escribió: otra escritura lo cambió (docs/runbook.md, R7)")
+    logger.info("seal: test part written to %s", path.name)
+    return "written"

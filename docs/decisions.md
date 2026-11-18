@@ -158,7 +158,7 @@ Estados: **vigente**, **pendiente del dueño**, **reemplazada por Dxx**.
 - **Quién**: agente de planificación.
 - **Estado**: vigente. **Nota del 2026-11-17 (U09, lanzamiento en seco)**: pronósticos de la validación con todo ajustado en el entrenamiento, sobre 317.372 series-días con promoción (53.080 más quedan fuera porque su serie no tiene `a`: `no_regular_day`): F0 WAPE 48,43 % y sesgo −37,68 %; F2a 45,29 % y −0,26 %; F2 43,10 % y +2,98 %; F1, la regla ingenua, **35,64 % y −20,28 %, igual a `p04`**. F2 − F0 −5,33 [−6,77; −3,92], F2 − F2a −2,19 [−2,84; −1,54] y F2 − F1 +7,47 [+5,86; +9,19] puntos (dos vías): como en `p05`, el aumento de la celda agrega información sobre un aumento único y no supera a la última semana de la serie (lo esperable para C09). Las diferencias de F0, F2a y F2 con `p04` y `p05` (48,37 %, 45,62 %, 43,37 %) vienen de κ y de la corrección de `day_factor` (D09).
 
-## D16 Criterios C01-C10 y lo que se vio antes de fijarlos
+## D16 Criterios C01-C10 y lo que se vio antes de fijarlos **Nota del 2026-11-18 (U11)**: C01 compara la recuperación sellada con R1 en la máscara de cola emitida de la prueba; si el método sellado fuera R1, la diferencia es 0 y el criterio no se cumple (un empate no supera). C05 y C06 usan las celdas con al menos `min_series` series en el lanzamiento y en la semana; C06 reconstruye los remuestreos del lanzamiento con su propia semilla desde el artefacto (`bundle.cf`) y los resta de los de la semana, que no comparten pesos (D41). C10 es informativo: dice cuántas cifras de variantes y cuántos días tiene el seguimiento.
 
 - **Contexto**: el planificador midió casi todo sobre el entrenamiento y la validación (sección 4 de los requerimientos); los proyectos 03 a 05 dijeron lo esperable antes de medir.
 - **Opciones**: un solo camino razonable: fijar los criterios con dos columnas de lo visto, la de la investigación y la del planificador, y lo esperable escrito.
@@ -168,7 +168,7 @@ Estados: **vigente**, **pendiente del dueño**, **reemplazada por Dxx**.
 - **Quién**: agente de planificación.
 - **Estado**: vigente.
 
-## D17 La prueba se lee una vez: lanzamiento congelado y sello con una huella que cubre cada clave que cambia un valor sellado
+## D17 La prueba se lee una vez: lanzamiento congelado y sello con una huella que cubre cada clave que cambia un valor sellado **Nota del 2026-11-18 (U11)**: la parte de la prueba del sello tiene las claves `run_key`, `as_of`, `config_sha256`, `criteria`, `metrics`, `recovery`, `effects`, `replication`, `forecast`, `variants` y `days` (`registry.TEST_KEYS`); `metrics` son las cifras de las que `evaluation.criteria_of` reconstruye C01-C10 (y `criteria_from_seal` exige que cada entrada del sello se reconstruya a 6 decimales). `check_test_evaluation` decide antes de escribir (`first`, `repeat`, `post_seal`, o `EvaluationRefusedError` con las claves que difieren) y `write_test_seal` escribe la parte una vez, la relee y compara una repetición a 6 decimales salvo `run_key`, `as_of` y las huellas. Las filas selladas de `eval_criteria`, `eval_replication`, `eval_forecast` y `eval_variants` (`003_eval.sql`) no se cambian, no se borran y no se insertan dos veces; `eval_pairs` y `eval_leakage` son de solo inserción sin estado posterior; un análisis `post_seal` guarda solo esas cuatro tablas con su estado y reemplaza las filas `post_seal` del análisis anterior, y los efectos y la recuperación de la prueba (`effect_estimates` y `recovery_checks` con alcance `test`) solo existen sellados.
 
 - **Contexto**: la lección de los proyectos 02 a 05 (B4 del 03, D89 del 04): la prueba se toca una vez y una configuración distinta después del sello no reemplaza lo sellado.
 - **Opciones**: un solo camino razonable: el sello del proyecto 05, adaptado.
@@ -288,7 +288,7 @@ Estados: **vigente**, **pendiente del dueño**, **reemplazada por Dxx**.
 - **Quién**: agente de planificación.
 - **Estado**: vigente.
 
-## D29 La suite rápida: límite de 120 s y presupuesto de trabajo de 90 s
+## D29 La suite rápida: límite de 120 s y presupuesto de trabajo de 90 s **Nota del 2026-11-18 (U11)**: la suite por defecto pasó de 575 pruebas en 61,1 s (medida al empezar la sesión de U11, con el equipo más lento que en las notas anteriores) a 642 en 57,1 s y 58,2 s (dos corridas en reposo): U11 suma unos 5 s a la suite, menos de los 8 s que piden justificarse, de los cuales unos 4 s son el accesorio de sesión `issued_week` (las siete entregas de la prueba cargadas y emitidas sobre una copia del lanzamiento, una vez por sesión) y unos 2 s la evaluación del cierre (`evaluated_week`, una vez por sesión); las demás pruebas de la evaluación trabajan sobre esos dos estados o sobre copias de ellos.
 
 - **Contexto**: el proyecto 05 terminó en 76,3 s tras tres unidades de velocidad y pasó una vez los 90 s (A3).
 - **Opciones**: (a) el mismo límite y presupuesto; (b) un presupuesto más bajo.
@@ -407,3 +407,13 @@ Estados: **vigente**, **pendiente del dueño**, **reemplazada por Dxx**.
 - **Afecta**: la construcción; el documento de seguimiento.
 - **Quién**: agente de planificación.
 - **Estado**: vigente; la estrategia de PR, pendiente del dueño (plan, sección 29, ítem 14).
+
+## D41 La semana de prueba se remuestrea con la semilla más uno, y el lanzamiento se reconstruye con su propia semilla para compararlos
+
+- **Contexto**: C06 pide remuestrear por separado lo sellado y la prueba y restar remuestra a remuestra; el generador de pesos de `bootstrap.two_way_draws_many` toma primero los pesos de las series, de modo que dos poblaciones con las mismas series y la misma semilla comparten esos pesos. El sello guarda el aumento y el intervalo de cada celda del lanzamiento, no sus remuestras.
+- **Opciones**: (a) usar la misma semilla en las dos y restar; (b) usar para la semana la semilla de la configuración más uno (como ya hace la réplica del lanzamiento sobre la validación) y reconstruir las remuestras del lanzamiento con su semilla desde el artefacto; (c) aproximar la diferencia con los dos intervalos publicados, como si fueran normales e independientes.
+- **Decisión**: (b). `evaluation.SEED_OFFSET = 1` para todos los intervalos de la semana de prueba (efectos, C04, pronósticos y variantes); el lanzamiento se lee del cubo, se recupera con el método sellado y se estima con el contrafactual del artefacto, y una comprobación exige que sus aumentos sean los sellados (`SealError` si no).
+- **Motivo**: (a) correlaciona las dos remuestras y estrecha la diferencia sin decirlo; (c) supone una distribución que no se midió; (b) cuesta una lectura más del período del lanzamiento, pero deja la diferencia con la dispersión que sus dos lados tienen por separado.
+- **Afecta**: `evaluation.py`; `variants.py`; C04-C09; las filas `test` de `effect_estimates`.
+- **Quién**: agente de construcción (Sonnet), U11.
+- **Estado**: vigente.

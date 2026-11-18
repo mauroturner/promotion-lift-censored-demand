@@ -131,18 +131,18 @@ class LaunchResult:
     bundle: LaunchBundle | None = None
 
 
-def _stamp(value: Any) -> str:
+def stamp(value: Any) -> str:
     return pd.Timestamp(value).strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _clean(value: Any) -> Any:
+def clean(value: Any) -> Any:
     """JSON-ready: NaN and infinities are None, numpy numbers are Python ones."""
     if isinstance(value, Mapping):
-        return {str(k): _clean(v) for k, v in value.items()}
+        return {str(k): clean(v) for k, v in value.items()}
     if isinstance(value, np.ndarray):
-        return [_clean(v) for v in value.tolist()]
+        return [clean(v) for v in value.tolist()]
     if isinstance(value, (list, tuple)):
-        return [_clean(v) for v in value]
+        return [clean(v) for v in value]
     if isinstance(value, (np.floating, float)):
         return float(value) if np.isfinite(value) else None
     if isinstance(value, (np.integer, int)) and not isinstance(value, bool):
@@ -175,29 +175,29 @@ def _verify(cfg: Any, view: Any, row: Mapping[str, Any]) -> LaunchResult:
     return LaunchResult("verify", state, row["model_version"], config_sha256, row["artifact_sha256"], row["r3_sha256"], recovery, rules, {}, None, None, bundle)
 
 
-def _launch_keys(view: Any) -> np.ndarray:
+def launch_keys(view: Any) -> np.ndarray:
     first, last = view.calendar.first_day, view.calendar.launch_last_day
     return np.array([date_key(first + timedelta(days=k)) for k in range((last - first).days + 1)], dtype=np.int32)
 
 
-def _unit_series(rec: Records, unit_of: np.ndarray, n_units: int) -> np.ndarray:
+def unit_series(rec: Records, unit_of: np.ndarray, n_units: int) -> np.ndarray:
     """How many distinct series each unit has."""
     keep = np.asarray(unit_of) >= 0
     pair = np.unique(np.asarray(unit_of)[keep].astype(np.int64) * rec.n_series + rec.series[keep])
     return np.bincount(pair // rec.n_series, minlength=n_units)
 
 
-def _unit(rec: Records, unit_of: np.ndarray, n_units: int, draws: np.ndarray) -> dict[str, np.ndarray]:
+def unit_stats(rec: Records, unit_of: np.ndarray, n_units: int, draws: np.ndarray) -> dict[str, np.ndarray]:
     """What a family of units reports: lift, interval, sums, series and series-days."""
     keep = np.asarray(unit_of) >= 0
     low, high = interval(draws)
-    return {"lift": lifts(rec, unit_of, n_units), "low": low, "high": high, "series": _unit_series(rec, unit_of, n_units),
+    return {"lift": lifts(rec, unit_of, n_units), "low": low, "high": high, "series": unit_series(rec, unit_of, n_units),
             "observed": np.bincount(np.asarray(unit_of)[keep], weights=rec.observed[keep], minlength=n_units),
             "counterfactual": np.bincount(np.asarray(unit_of)[keep], weights=rec.counterfactual[keep], minlength=n_units),
             "series_days": np.bincount(np.asarray(unit_of)[keep], minlength=n_units)}
 
 
-def _effect_row(scope: str, version: str, unit: str, key: str, fit_blocks: str, stats: dict[str, np.ndarray], at: int, ranking: pd.DataFrame | None = None) -> tuple:
+def effect_row(scope: str, version: str, unit: str, key: str, fit_blocks: str, stats: dict[str, np.ndarray], at: int, ranking: pd.DataFrame | None = None) -> tuple:
     """A row of ``effect_estimates`` for the unit at position `at` of a family (a unit with no records has no lift: NaN is NULL)."""
     def number(x: float) -> float | None:
         return float(x) if np.isfinite(x) else None
@@ -232,7 +232,7 @@ def _check_masked(name: str, masked: MaskedBlock, minimum: int) -> None:
 def _launch(cfg: Any, conn: sqlite3.Connection, run: RunMeta, view: Any, extras: dict[str, Callable[..., np.ndarray]]) -> LaunchResult:
     check_split(view)
     r, naive_days, n_bands = view.recovery, view.forecast.naive_days, len(view.days.bands) - 1
-    keys = _launch_keys(view)
+    keys = launch_keys(view)
     cube = open_loaded_cube(cfg.paths.interim_dir)
     held = cube.date_keys.tolist()
     later = [k for k in held if k > int(keys[-1])]
@@ -306,7 +306,7 @@ def _launch(cfg: Any, conn: sqlite3.Connection, run: RunMeta, view: Any, extras:
     cell_train = cell_of(gpos[rec_train.series], band[:, train_idx][rec_train.series, rec_train.day], n_bands)
     total_train = np.zeros(len(rec_train.series), dtype=np.int64)
     d_total, d_cell = two_way_draws_many(rec_train, [(total_train, 1), (cell_train, n_cells)], view.bootstrap.resamples, view.bootstrap.seed)
-    train_total, train_cells = _unit(rec_train, total_train, 1, d_total), _unit(rec_train, cell_train, n_cells, d_cell)
+    train_total, train_cells = unit_stats(rec_train, total_train, 1, d_total), unit_stats(rec_train, cell_train, n_cells, d_cell)
     b_valid = day_factor(valid_view, cf_train, regular_mask(state[:, valid_idx]), gpos)
     cf_valid = replace(cf_train, b=b_valid, days=keys[valid_idx])
     rec_valid = records(valid_view, cf_valid, state[:, valid_idx] == PROMO, gpos)
@@ -315,7 +315,7 @@ def _launch(cfg: Any, conn: sqlite3.Connection, run: RunMeta, view: Any, extras:
     total_valid = np.zeros(len(rec_valid.series), dtype=np.int64)
     v_total, v_cell, v_band = two_way_draws_many(rec_valid, [(total_valid, 1), (cell_valid, n_cells), (band_valid.astype(np.int64), n_bands)], view.bootstrap.resamples,
                                                  view.bootstrap.seed + 1)
-    valid_total, valid_cells, valid_bands = _unit(rec_valid, total_valid, 1, v_total), _unit(rec_valid, cell_valid, n_cells, v_cell), _unit(rec_valid, band_valid.astype(np.int64), n_bands, v_band)
+    valid_total, valid_cells, valid_bands = unit_stats(rec_valid, total_valid, 1, v_total), unit_stats(rec_valid, cell_valid, n_cells, v_cell), unit_stats(rec_valid, band_valid.astype(np.int64), n_bands, v_band)
     both = ((train_cells["series"] >= view.ranking.min_series) & (valid_cells["series"] >= view.ranking.min_series) & np.isfinite(train_cells["lift"]) & np.isfinite(valid_cells["lift"]))
     difference_low, difference_high = interval(v_cell[:, both] - d_cell[:, both]) if both.any() else (np.array([]), np.array([]))
     finite = np.isfinite(valid_bands["lift"])
@@ -368,10 +368,10 @@ def _launch(cfg: Any, conn: sqlite3.Connection, run: RunMeta, view: Any, extras:
         flagged = records(CubeView(values, keys), cfs[version], state == UNFLAGGED, gpos)
         unflagged_band = band[flagged.series, flagged.day].astype(np.int64)
         (unflagged_draws,) = two_way_draws_many(flagged, [(unflagged_band, n_bands)], view.bootstrap.resamples, view.bootstrap.seed)
-        cells = _unit(rec_all, unit_cell, n_cells, draws[1])
+        cells = unit_stats(rec_all, unit_cell, n_cells, draws[1])
         estimates[version] = {
-            "overall": _unit(rec_all, unit_total, 1, draws[0]), "cell": cells, "band": _unit(rec_all, unit_band, n_bands, draws[2]),
-            "group": _unit(rec_all, unit_group, n_groups, draws[3]), "unflagged_band": _unit(flagged, unflagged_band, n_bands, unflagged_draws),
+            "overall": unit_stats(rec_all, unit_total, 1, draws[0]), "cell": cells, "band": unit_stats(rec_all, unit_band, n_bands, draws[2]),
+            "group": unit_stats(rec_all, unit_group, n_groups, draws[3]), "unflagged_band": unit_stats(flagged, unflagged_band, n_bands, unflagged_draws),
             "ranking": rank_cells(cells["lift"], cells["low"], cells["high"], cells["series"], view.ranking.min_series),
             "naive": naive_pooled(CubeView(values, keys), state)}
     bundle = LaunchBundle(
@@ -409,14 +409,14 @@ def _launch(cfg: Any, conn: sqlite3.Connection, run: RunMeta, view: Any, extras:
                  for scope, rows in checks.items()}
     recovery_doc = {"method": chosen.method, "kappa": chosen.kappa, "name": choice.name, "grid_edge": _grid_edge(chosen, r.kappas), "wape_v1": choice.wape[choice.name],
                     "wape_v2": wape_v2["chosen"], "candidates_v1": {n: choice.wape[n] for n in names}, "pmf": pmf}
-    validation = _clean({
+    validation = clean({
         "recovery_v1": {"fit_blocks": FIT_BLOCKS_VALID, **score_doc["valid_v1"]}, "recovery_v2": {"fit_blocks": FIT_BLOCKS_VALID, **score_doc["valid_v2"]},
         "replication": replication, "forecast": forecast_doc,
         "leakage": {row.check_id: {"wape": row.wape, "trips_m01": row.trips_m01} for row in leakage.itertuples()}})
     digest = canonical_sha256(_rounded(validation))
     artifact_sha, r3_sha = artifact_digests(bundle)
-    document = _clean({
-        "run_key": run.run_key, "as_of": _stamp(run.as_of), "train_sha256": view.train_sha256_seen, "eval_sha256": view.eval_sha256_seen, "config_sha256": config_fingerprint(view),
+    document = clean({
+        "run_key": run.run_key, "as_of": stamp(run.as_of), "train_sha256": view.train_sha256_seen, "eval_sha256": view.eval_sha256_seen, "config_sha256": config_fingerprint(view),
         "sealed_config": sealed_document(view), "model_version": MODEL_VERSION, "artifact_sha256": artifact_sha, "r3_sha256": r3_sha, "recovery": recovery_doc,
         "effects": effects_doc, "validation": validation, "validation_digest": digest})
     outcome = launch_seal_outcome(cfg.paths.seal, document)           # refuses a repetition that does not reproduce the seal, before anything is written
@@ -436,7 +436,7 @@ def _launch(cfg: Any, conn: sqlite3.Connection, run: RunMeta, view: Any, extras:
             stats = estimates[version][family]
             for at, key in enumerate(keys_of):
                 if stats["series_days"][at]:
-                    effect_rows.append(_effect_row("launch", version, unit, key, FIT_BLOCKS_LAUNCH, stats, at, estimates[version]["ranking"] if unit == "cell" else None))
+                    effect_rows.append(effect_row("launch", version, unit, key, FIT_BLOCKS_LAUNCH, stats, at, estimates[version]["ranking"] if unit == "cell" else None))
         rows_all = all_records[version]
         promo_days = state == PROMO
         daily = CubeView((block.sales if version == "raw" else recovered_all), keys).values.sum(axis=2, dtype=np.float64)
@@ -447,14 +447,14 @@ def _launch(cfg: Any, conn: sqlite3.Connection, run: RunMeta, view: Any, extras:
                                           ("band", valid_bands, [f"b{k}" for k in range(n_bands)], None)):
         for at, key in enumerate(keys_of):
             if stats["series_days"][at]:
-                effect_rows.append(_effect_row("valid_replication", "recovered", unit, key, FIT_BLOCKS_VALID, stats, at, ranking))
+                effect_rows.append(effect_row("valid_replication", "recovered", unit, key, FIT_BLOCKS_VALID, stats, at, ranking))
     forecast_rows = list(zip(forecast_frame["series_key"].astype(int).tolist(), forecast_frame["date_key"].astype(int).tolist(), forecast_frame["method"].tolist(),
                              forecast_frame["forecast"].astype(float).tolist(), forecast_frame["observed_instock"].astype(float).tolist(), ["valid"] * len(forecast_frame),
                              [run.run_key] * len(forecast_frame), strict=True))
     seal_label = "post_seal" if outcome == "post_seal" else "sealed"
-    row = {"model_version": MODEL_VERSION, "trained_as_of": _stamp(run.as_of), "artifact_name": ARTIFACT_NAME, "artifact_sha256": artifact_sha, "r3_name": R3_NAME if r3_sha else None,
+    row = {"model_version": MODEL_VERSION, "trained_as_of": stamp(run.as_of), "artifact_name": ARTIFACT_NAME, "artifact_sha256": artifact_sha, "r3_name": R3_NAME if r3_sha else None,
            "r3_sha256": r3_sha, "config_sha256": document["config_sha256"],
-           "recovery_json": json.dumps(_clean({**recovery_doc, "seal": seal_label, "candidates_v2": {n: score_doc["valid_v2"][n]["wape_series"] for n in order}}), sort_keys=True),
+           "recovery_json": json.dumps(clean({**recovery_doc, "seal": seal_label, "candidates_v2": {n: score_doc["valid_v2"][n]["wape_series"] for n in order}}), sort_keys=True),
            "validation_digest": digest}
     series_without_regular = int(np.isnan(cfs["recovered"].a[:, 0]).sum())
 

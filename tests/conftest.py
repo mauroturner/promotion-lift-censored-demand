@@ -328,3 +328,81 @@ def fresh(launch_config, store_upto, tmp_path: Path):
     yield build
     for conn in opened:
         conn.close()
+
+
+# --- the issued week of the test (U11 on) ----------------------------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def issued_week(launched, published, canonical, cfg, launch_config, tmp_path_factory: pytest.TempPathFactory):
+    """The launch store of ``launched`` with the seven days of the test loaded and issued one delivery after another, and the close loaded (it has no rows): what the
+    evaluation of the test reads. Built once per session and read-only; a test that evaluates works on ``week_copy``."""
+    from datetime import datetime
+    from types import SimpleNamespace
+
+    from promolift.cube import open_loaded_cube
+    from promolift.daily import run_day
+    from promolift.registry import RunMeta, sealed_view
+    from promolift.warehouse import connect, load_delivery
+
+    folder = tmp_path_factory.mktemp("issued_week")
+    for name in ("interim", "models", "reports"):
+        shutil.copytree(launched.folder / name, folder / name)
+    shutil.copyfile(launched.db, folder / "w.sqlite")
+    week_cfg = launch_config(folder)
+    view = sealed_view(week_cfg, launched.train, launched.eval)
+    bundle = launched.result.bundle
+    conn = connect(folder / "w.sqlite")
+    try:
+        for spec in published.plan:
+            if spec.kind == "launch":
+                continue
+            entry, days, cube_files = published.items[spec.delivery_id]
+            load_delivery(conn, days, cube_files, spec, f"run-{spec.delivery_id}", cfg, sha256=entry.sha256, series=canonical.series, interim_dir=folder / "interim")
+            if spec.kind == "daily":
+                run_day(conn, open_loaded_cube(folder / "interim"), bundle, RunMeta(f"run-{spec.delivery_id}", spec.as_of), spec, view, interim_dir=folder / "interim")
+    finally:
+        conn.close()
+    close = published.plan[-1]
+    return SimpleNamespace(folder=folder, cfg=week_cfg, view=view, bundle=bundle, db=folder / "w.sqlite", interim=folder / "interim", train=launched.train, eval=launched.eval,
+                           run=RunMeta("run-close", close.as_of), close=close)
+
+
+@pytest.fixture
+def week_copy(issued_week, launch_config, tmp_path: Path):
+    """``week_copy()``: a copy of ``issued_week`` inside this test's ``tmp_path`` for a test that evaluates, with its configuration, a connection and the loaded cube."""
+    from types import SimpleNamespace
+
+    from promolift.cube import open_loaded_cube
+    from promolift.registry import sealed_view
+    from promolift.warehouse import connect
+
+    opened = []
+
+    def copy(**sections):
+        folder = tmp_path / "week"
+        shutil.copytree(issued_week.folder, folder)
+        week_cfg = launch_config(folder, **sections)
+        conn = connect(folder / "w.sqlite")
+        opened.append(conn)
+        return SimpleNamespace(folder=folder, cfg=week_cfg, view=sealed_view(week_cfg, issued_week.train, issued_week.eval), conn=conn, db=folder / "w.sqlite",
+                               cube=open_loaded_cube(folder / "interim"), bundle=issued_week.bundle, run=issued_week.run, seal=week_cfg.paths.seal)
+
+    yield copy
+    for conn in opened:
+        conn.close()
+
+
+@pytest.fixture(scope="session")
+def evaluated_week(issued_week, launch_config, tmp_path_factory: pytest.TempPathFactory):
+    """The issued week evaluated once as the run of the close, on a copy of its own: the connection of ``clone`` is closed, ``out`` is what ``evaluate`` returned.
+    Read-only; a test that writes works on a ``clone`` of its ``folder``."""
+    from types import SimpleNamespace
+
+    from promolift.reporting import evaluate
+    from tests.fixtures.weeks import clone
+
+    w = clone(issued_week.folder, tmp_path_factory.mktemp("evaluated_week") / "w", launch_config, issued_week.train, issued_week.eval)
+    out = evaluate(w.conn, w.cube, issued_week.bundle, issued_week.run, w.view, seal_path=w.seal)
+    w.conn.close()
+    return SimpleNamespace(**{**vars(w), "out": out, "bundle": issued_week.bundle, "run": issued_week.run, "folder": w.db.parent})

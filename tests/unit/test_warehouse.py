@@ -18,7 +18,9 @@ PROJECT = Path(__file__).resolve().parents[2]
 CORE_TABLES = ["deliveries", "hour_profile", "pipeline_runs", "series", "series_days", "validation_results"]
 # 002_effects.sql (U09, U10): what the model said, issued once
 EFFECT_TABLES = ["daily_cell", "effect_estimates", "forecasts", "mask_checks", "model_registry", "recovery_checks"]
-SCHEMA_TABLES = sorted([*CORE_TABLES, *EFFECT_TABLES])
+# 003_eval.sql (U11): the evaluation of the test week
+EVAL_TABLES = ["eval_criteria", "eval_forecast", "eval_leakage", "eval_pairs", "eval_replication", "eval_variants"]
+SCHEMA_TABLES = sorted([*CORE_TABLES, *EFFECT_TABLES, *EVAL_TABLES])
 
 
 def tables(conn) -> list[str]:

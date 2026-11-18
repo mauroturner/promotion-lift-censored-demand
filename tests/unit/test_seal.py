@@ -108,6 +108,16 @@ def launch_document(cfg, **changes):
     return {**document, **changes}
 
 
+def sealed_test_part(launch, **changes):
+    """A test part of the seal (U11) for the launch document `launch`: the keys of ``TEST_KEYS`` with small values."""
+    part = {"run_key": "run-close", "as_of": "2024-07-03 00:00:00", "config_sha256": launch["config_sha256"],
+            "criteria": [{"id": "C01", "value": 0.31, "baseline_value": 0.37, "ci_low": -0.08, "ci_high": -0.05, "passed": True, "verdict_es": "La recuperación supera a R1."}],
+            "metrics": {"recovery": {"wape": 0.31}}, "recovery": {"r1": {"wape_series": 0.37}}, "effects": {"overall": {"recovered": {"lift": 0.55}}},
+            "replication": {"cells": 40}, "forecast": {"f1_naive": {"wape": 0.36}}, "variants": [{"variant": "mcar_mask", "unit_key": "r1:wape", "value": 0.4}],
+            "days": [{"date_key": 20240626, "lift_recovered": 0.5}]}
+    return {**part, **changes}
+
+
 def test_the_seal_is_written_once_and_a_repetition_with_the_same_configuration_reproduces_it(cfg, tmp_path):
     seal = tmp_path / "reports" / "model_seal.json"
     document = launch_document(cfg)
