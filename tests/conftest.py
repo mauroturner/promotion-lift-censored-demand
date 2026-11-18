@@ -207,3 +207,56 @@ def published(cfg, canonical, tmp_path_factory: pytest.TempPathFactory):
         days, cube = read_delivery(out, entry)
         result.items[spec.delivery_id] = (entry, days, cube)
     return result
+
+
+# --- warehouses with their deliveries loaded (U07 on) -------------------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def store_upto(cfg, canonical, published, tmp_path_factory: pytest.TempPathFactory):
+    """``store_upto(delivery_id)``: a ``Store`` (``db``, ``interim``, ``loaded``) with every delivery of the plan up to `delivery_id` loaded into one
+    warehouse and into the cube of the loaded deliveries, each built once per session. Read-only: a test that writes works on ``copy_store``."""
+    from dataclasses import dataclass
+
+    from promolift.warehouse import connect, load_delivery
+
+    @dataclass(frozen=True)
+    class Store:
+        db: Path
+        interim: Path
+        loaded: tuple[str, ...]
+
+    built: dict[str, Store] = {}
+
+    def build(delivery_id: str) -> Store:
+        if delivery_id not in built:
+            ids = [spec.delivery_id for spec in published.plan]
+            take = ids[: ids.index(delivery_id) + 1]
+            folder = tmp_path_factory.mktemp(f"store_{delivery_id}")
+            conn = connect(folder / "w.sqlite")
+            try:
+                for spec in published.plan:
+                    if spec.delivery_id in take:
+                        entry, days, cube_files = published.items[spec.delivery_id]
+                        load_delivery(conn, days, cube_files, spec, f"run-{spec.delivery_id}", cfg, sha256=entry.sha256, series=canonical.series,
+                                      interim_dir=folder / "interim")
+            finally:
+                conn.close()
+            built[delivery_id] = Store(folder / "w.sqlite", folder / "interim", tuple(take))
+        return built[delivery_id]
+
+    return build
+
+
+@pytest.fixture
+def copy_store(tmp_path: Path):
+    """``copy_store(store)``: a copy of a ``Store`` inside this test's ``tmp_path``, for a test that loads or writes."""
+
+    def copy(store):
+        from dataclasses import replace
+
+        shutil.copytree(store.interim, tmp_path / "interim")
+        shutil.copyfile(store.db, tmp_path / "w.sqlite")
+        return replace(store, db=tmp_path / "w.sqlite", interim=tmp_path / "interim")
+
+    return copy

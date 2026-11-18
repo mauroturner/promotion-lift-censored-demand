@@ -17,7 +17,9 @@ import hashlib
 import io
 import json
 import re
+import sqlite3
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +27,9 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from promolift.days import STATE_NAMES
 from promolift.files import atomic_path, sha256_file, write_atomic
+from promolift.schema import FORBIDDEN_COLUMNS, TARGET_COLUMNS
 
 INTERIM_MANIFEST = "interim_manifest.json"
 INTERIM_MANIFEST_VERSION = 1
@@ -290,3 +294,116 @@ def open_loaded_cube(interim_dir: Path) -> LoadedCube:
             if sha256_file(folder / name) != expected:
                 raise InterimError(f"{name} no coincide con la huella que dice el manifiesto: es de otra escritura (runbook R12)")
     return LoadedCube(folder, entries)
+
+
+# --- the inputs of the recovery and of the effect (U07; RNF06, D05, D19; plan, section 10) -------------------------------------------------------
+
+
+class LeakageError(RuntimeError):
+    """A frame that feeds a method holds a column that is forbidden, a target or simply not on the list of inputs (M02, AC10)."""
+
+
+# What the learned recovery (R3) may read for one hour without stock; nothing else can reach it (``build_inputs``)
+INPUT_COLUMNS: tuple[str, ...] = ("hour", "cut", "base", "observed_mass", "expected_mass", "total_mass", "promo", "depth", "weekday", "group")
+
+
+@dataclass(frozen=True)
+class DayInputs:
+    """What the recovery of one day, the synthetic mask and the forecasts receive: the sale and the stock status of the analysis hours of that day,
+    its day state, band and group, and nothing else (there is no other daily field in the cube or in the warehouse's series-days)."""
+
+    series_key: np.ndarray      # int32 (series,)
+    date_key: int
+    hours: np.ndarray           # int (hours,): the clock hour of each column
+    sales: np.ndarray           # float32 (series, hours); NaN where a mask hid the hour
+    stock: np.ndarray           # int8 (series, hours): 1 = no stock
+    state: np.ndarray           # int8 (series,): days.PROMO, REGULAR, UNFLAGGED or ANOMALOUS
+    band: np.ndarray            # int8 (series,): 0 to 6 for a promo or unflagged day, -1 otherwise
+    group: np.ndarray           # int64 (series,): management_group_id
+
+
+@dataclass(frozen=True)
+class BlockInputs:
+    """The same for a run of days, stacked: ``sales`` and ``stock`` are (series, days, hours), ``state`` and ``band`` (series, days)."""
+
+    series_key: np.ndarray
+    date_keys: np.ndarray       # int32 (days,)
+    hours: np.ndarray
+    sales: np.ndarray
+    stock: np.ndarray
+    state: np.ndarray
+    band: np.ndarray
+    group: np.ndarray
+
+    def day(self, position: int) -> DayInputs:
+        """The inputs of the day at `position` of the block (views of the block's arrays)."""
+        return DayInputs(self.series_key, int(self.date_keys[position]), self.hours, self.sales[:, position, :], self.stock[:, position, :],
+                         self.state[:, position], self.band[:, position], self.group)
+
+
+_STATE_CODES = "CASE day_state " + " ".join(f"WHEN '{name}' THEN {code}" for code, name in enumerate(STATE_NAMES)) + " END"
+
+
+def _series_of(conn: sqlite3.Connection, n_series: int) -> tuple[np.ndarray, np.ndarray]:
+    """``(series_key, management_group_id)`` of the warehouse's series; they must be the series of the cube, numbered from 0 without gaps."""
+    rows = conn.execute("SELECT series_key, management_group_id FROM series ORDER BY series_key").fetchall()
+    table = np.array(rows, dtype=np.int64).reshape(-1, 2)
+    if len(table) != n_series or not np.array_equal(table[:, 0], np.arange(n_series)):
+        raise InterimError(f"las series del almacén ({len(table)}) no son las {n_series} del cubo, numeradas desde 0 sin huecos (runbook R12)")
+    return table[:, 0].astype(np.int32), table[:, 1]
+
+
+def load_block(cube: Any, conn: sqlite3.Connection, date_keys: Any, view: Any) -> BlockInputs:
+    """The inputs of `date_keys` (in the order given) from the cube of the loaded deliveries and the warehouse: ``KeyError`` for a day that was not delivered.
+
+    The hours are the analysis hours of ``view.calendar.day_hours`` (06 to 21); the state and the band of each series-day are the ones the load stored. The
+    cube is read first, so a day that has not arrived is refused before the warehouse is asked for anything about it (RNF06 b)."""
+    keys = np.atleast_1d(np.asarray(date_keys)).astype(np.int32)
+    first, last = view.calendar.day_hours
+    n_series, n_hours = cube.n_series, last - first + 1
+    sales = np.empty((n_series, len(keys), n_hours), dtype=np.float32)
+    stock = np.empty((n_series, len(keys), n_hours), dtype=np.int8)
+    for position, key in enumerate(keys.tolist()):
+        sales[:, position, :] = cube.sales(key)[:, first:last + 1]
+        stock[:, position, :] = cube.stock(key)[:, first:last + 1]
+    series_key, group = _series_of(conn, n_series)
+    state = np.empty((n_series, len(keys)), dtype=np.int8)
+    band = np.empty((n_series, len(keys)), dtype=np.int8)
+    for position, key in enumerate(keys.tolist()):
+        rows = np.array(conn.execute(f"SELECT series_key, {_STATE_CODES}, COALESCE(band, -1) FROM series_days WHERE date_key = ? ORDER BY series_key",
+                                     (key,)).fetchall(), dtype=np.int16).reshape(-1, 3)
+        if len(rows) != n_series or not np.array_equal(rows[:, 0], np.arange(n_series)):
+            raise InterimError(f"el almacén tiene {len(rows)} series-días del día {key} y el cubo {n_series} series (runbook R12)")
+        state[:, position], band[:, position] = rows[:, 1], rows[:, 2]
+    return BlockInputs(series_key, keys, np.arange(first, last + 1), sales, stock, state, band, group)
+
+
+def day_inputs(cube: Any, conn: sqlite3.Connection, date_key: int, view: Any) -> DayInputs:
+    """The inputs of one day: the one reader of a day, ``load_block`` of one day."""
+    return load_block(cube, conn, [date_key], view).day(0)
+
+
+def group_index(group: np.ndarray, group_ids: np.ndarray) -> np.ndarray:
+    """The dense position (0 to groups - 1) of each management group id in the sorted `group_ids`; an id that is not there is a ``ValueError``."""
+    group, ids = np.asarray(group), np.asarray(group_ids)
+    position = np.minimum(np.searchsorted(ids, group), len(ids) - 1)
+    unknown = group[ids[position] != group]
+    if len(unknown):
+        raise ValueError(f"el grupo de gestión {int(unknown[0])} no está entre los grupos conocidos {ids.tolist()}")
+    return position.astype(np.int64)
+
+
+def build_inputs(frame: Any) -> Any:
+    """The frame of R3's features, checked (M02): ``LeakageError`` if it has a forbidden column, a target or any column outside ``INPUT_COLUMNS``, or lacks one.
+    The columns come back in the order of ``INPUT_COLUMNS``."""
+    names = list(frame.columns)
+    forbidden = [name for name in names if name in FORBIDDEN_COLUMNS or name in TARGET_COLUMNS]
+    if forbidden:
+        raise LeakageError(f"M02: la entrada tiene la columna prohibida {forbidden[0]!r}; ninguna columna diaria ni el objetivo llega a un método")
+    unknown = [name for name in names if name not in INPUT_COLUMNS]
+    if unknown:
+        raise LeakageError(f"M02: la entrada tiene la columna {unknown[0]!r}, que no está entre las permitidas {list(INPUT_COLUMNS)}")
+    missing = [name for name in INPUT_COLUMNS if name not in names]
+    if missing:
+        raise LeakageError(f"M02: a la entrada le falta la columna {missing[0]!r} de las permitidas")
+    return frame[list(INPUT_COLUMNS)]
