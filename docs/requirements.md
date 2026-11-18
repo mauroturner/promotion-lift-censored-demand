@@ -122,7 +122,7 @@ De research.md (entrenamiento, sin la prueba salvo conteos y claves): `sale_amou
 - **RNF12 Sin datos personales.** El conjunto no tiene personas ni clientes (tiendas y productos con identificadores numéricos); ningún archivo publicado lleva rutas absolutas del equipo ni el nombre del usuario.
 - **RNF13 Idioma.** Documentación en español neutro; código, identificadores, tablas y columnas en inglés; medidas, títulos de visuales y textos del sitio en español (D31).
 - **RNF14 Honestidad.** La documentación dice solo lo que consta en el registro del documento de seguimiento y en `git log`, y se sincroniza después de la última corrección y **después de que el registro tenga la entrada que cita**; toda cifra con decimales que cita un documento sale del resumen o del sello y una prueba la compara a los decimales que el documento escribe (lecciones B3 y B4 del proyecto 05).
-- **RNF15 Suite rápida con presupuesto.** La suite por defecto termina en ≤ 120 s en este equipo, con un presupuesto de trabajo de 90 s que se mide después de cada unidad (D29).
+- **RNF15 Suite rápida con presupuesto.** La suite por defecto termina en ≤ 180 s en este equipo (decisión del dueño del 2026-11-18; antes, 120 s), con un presupuesto de trabajo de 150 s que se mide después de cada unidad (D29).
 - **RNF16 Un solo escritor.** Un solo proceso escribe una carpeta de datos a la vez, con un bloqueo cuya liberación nunca levanta y que solo su dueño borra (D26).
 
 ## 7. Requerimientos de datos
@@ -178,7 +178,7 @@ De research.md (entrenamiento, sin la prueba salvo conteos y claves): `sale_amou
 | AC35 | Reproducibilidad | Dos repeticiones completas seguidas dan el mismo contenido en cada Parquet y JSON, sin las columnas de la corrida; una reconstrucción con el sello compara lo que el sello fija, no las claves de corrida | Integración (sintético) y real |
 | AC36 | Dependencias | Cada módulo de terceros que importa `src/` es una dependencia directa fijada; `pip check` limpio, comprobado por su código de salida; las que el landing no declara tienen su fila en `LANDING-EXPANSION.md` con el 06 | Estática |
 | AC37 | Documentación | README con los títulos del plan en orden; diccionario de cada columna de cada Parquet; cada decisión con sus siete campos; runbook R1-R12; el número de pruebas que dicen los documentos es el de la colección de la sesión; cada cifra de memoria nombra su contador; el bloque de resultados es el del resumen; cada límite de intervalo citado es el del resumen a sus decimales; cada prueba nombrada en el plan, sección 24, existe; todo en el último commit de corrección y con su entrada en el registro | Unitaria sobre los Markdown |
-| AC38 | Suite rápida | La suite por defecto termina en ≤ 120 s, medida dos veces en reposo; una sesión completa que pasa el límite termina con falla y dice por cuánto | Medición y unitaria |
+| AC38 | Suite rápida | La suite por defecto termina en ≤ 180 s, medida dos veces en reposo; una sesión completa que pasa el límite termina con falla y dice por cuánto | Medición y unitaria |
 
 ### 8.1 Criterios del modelo, fijados antes de construir
 

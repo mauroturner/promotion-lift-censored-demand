@@ -57,13 +57,13 @@ def test_the_guards_mark_expression_is_the_default_one_of_pyproject():
     assert tokens.count("-m") == 1 and tokens[tokens.index("-m") + 1] == DEFAULT_MARKEXPR
 
 
-def test_the_project_limit_is_120_seconds_and_the_ten_slowest_are_reported(pytestconfig):
+def test_the_project_limit_is_180_seconds_and_the_ten_slowest_are_reported(pytestconfig):
     import shlex
     import tomllib
 
     from tests.fixtures.suite_budget import FAST_SUITE_LIMIT_S
 
-    assert FAST_SUITE_LIMIT_S == 120.0 and float(pytestconfig.getini("fast_suite_limit_s")) == 120.0
+    assert FAST_SUITE_LIMIT_S == 180.0 and float(pytestconfig.getini("fast_suite_limit_s")) == 180.0
     addopts = shlex.split(tomllib.loads((PROJECT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["pytest"]["ini_options"]["addopts"])
     assert "--durations=10" in addopts, "the ten slowest tests of every session are printed for the record (plan, section 24.1)"
 

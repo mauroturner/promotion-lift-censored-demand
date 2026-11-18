@@ -4,7 +4,7 @@ and says by how much.
 ``tests/conftest.py`` imports the three hooks, so they run in every session. A session is the full default selection when it was
 started without test paths (pytest took the ``testpaths`` of pyproject.toml), without ``-k``, ``--deselect`` or ``--lf``, and with the
 default mark expression; any other selection is a part of the suite and is never failed for its time. The limit is the ini option
-``fast_suite_limit_s`` (120 s by default), so a toy suite can set it to 0. The ten slowest tests of every session are printed by
+``fast_suite_limit_s`` (180 s by default), so a toy suite can set it to 0. The ten slowest tests of every session are printed by
 pytest itself (``--durations=10`` in pyproject.toml), for the record.
 """
 
@@ -14,7 +14,7 @@ import time
 
 import pytest
 
-FAST_SUITE_LIMIT_S = 120.0
+FAST_SUITE_LIMIT_S = 180.0
 DEFAULT_MARKEXPR = "not real_data and not docker"
 _START = pytest.StashKey[float]()
 
