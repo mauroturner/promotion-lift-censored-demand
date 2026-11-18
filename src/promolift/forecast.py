@@ -63,7 +63,7 @@ def forecasts(cf: Counterfactual, b_day: np.ndarray, lifts: Lifts, inputs: DayIn
     f0 = counterfactual(day_cf, group, series, np.zeros(len(usable), dtype=np.intp), in_stock)
     cell = cell_of(group[usable], inputs.band[usable], len(view.days.bands) - 1) if hasattr(view, "days") else cell_of(group[usable], inputs.band[usable], 7)
     cell_lift = np.where(cell >= 0, lifts.cell[np.maximum(cell, 0)], np.nan)
-    f1 = np.where(in_stock, history.values[series].mean(axis=1), 0.0).sum(axis=1)
+    f1 = np.where(in_stock, history.values[series].mean(axis=1, dtype=np.float64), 0.0).sum(axis=1)
     observed = np.where(in_stock, inputs.sales[usable], 0.0).sum(axis=1, dtype=np.float64)
     forecast = {"f0_no_lift": f0, "f1_naive": f1, "f2a_overall_lift": f0 * (1.0 + lifts.overall),
                 "f2_cell_lift": f0 * (1.0 + np.where(np.isfinite(cell_lift), cell_lift, lifts.overall))}

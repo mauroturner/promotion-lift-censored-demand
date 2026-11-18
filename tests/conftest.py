@@ -260,3 +260,71 @@ def copy_store(tmp_path: Path):
         return replace(store, db=tmp_path / "w.sqlite", interim=tmp_path / "interim")
 
     return copy
+
+
+# --- the launch (U09 on) ---------------------------------------------------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def launch_config(quick_cfg):
+    """``launch_config(folder, interim=None, **changes)``: the quick configuration with every folder it writes inside `folder` (and the cube read from `interim`);
+    `changes` replace keys of ``recovery``, ``split`` and so on as ``section=<replacement section>``."""
+    import dataclasses
+
+    def build(folder: Path, interim: Path | None = None, **sections):
+        paths = dataclasses.replace(
+            quick_cfg.paths, interim_dir=interim or folder / "interim", models_dir=folder / "models", seal=folder / "reports" / "model_seal.json",
+            warehouse=folder / "w.sqlite", reports_dir=folder / "reports")
+        return dataclasses.replace(quick_cfg, paths=paths, **sections)
+
+    return build
+
+
+@pytest.fixture(scope="session")
+def launched(store_upto, launch_config, fixture_truth, tmp_path_factory: pytest.TempPathFactory):
+    """The launch of the standard fixture, run once (the quick configuration, a small R3): a warehouse, a cube and a folder of its own, the ``LaunchResult`` and
+    the configuration. Read-only; a test that launches again works on ``copy_store`` and its own folder."""
+    from datetime import datetime
+    from types import SimpleNamespace
+
+    from promolift.launch import fit_model
+    from promolift.registry import RunMeta
+    from promolift.warehouse import connect
+
+    store = store_upto("L2024-06-25")
+    folder = tmp_path_factory.mktemp("launched")
+    shutil.copytree(store.interim, folder / "interim")
+    shutil.copyfile(store.db, folder / "w.sqlite")
+    cfg = launch_config(folder)
+    conn = connect(folder / "w.sqlite")
+    try:
+        result = fit_model(cfg, conn, RunMeta("run-launch", datetime(2024, 6, 26)), train_sha256=fixture_truth.train_sha256, eval_sha256=fixture_truth.eval_sha256)
+    finally:
+        conn.close()
+    return SimpleNamespace(folder=folder, cfg=cfg, result=result, db=folder / "w.sqlite", train=fixture_truth.train_sha256, eval=fixture_truth.eval_sha256)
+
+
+@pytest.fixture
+def fresh(launch_config, store_upto, tmp_path: Path):
+    """``fresh(seal=None, **sections)``: a launch-ready copy of the launch store (a warehouse without the model and its cube) in this test's folder, and the
+    quick configuration pointed at it: ``(cfg, conn)``. The connections are closed when the test ends."""
+    import dataclasses
+
+    from promolift.warehouse import connect
+
+    store = store_upto("L2024-06-25")
+    opened = []
+
+    def build(seal: Path | None = None, **sections):
+        shutil.copytree(store.interim, tmp_path / "interim", dirs_exist_ok=True)
+        shutil.copyfile(store.db, tmp_path / "w.sqlite")
+        cfg = launch_config(tmp_path, **sections)
+        if seal is not None:
+            cfg = dataclasses.replace(cfg, paths=dataclasses.replace(cfg.paths, seal=seal))
+        conn = connect(tmp_path / "w.sqlite")
+        opened.append(conn)
+        return cfg, conn
+
+    yield build
+    for conn in opened:
+        conn.close()

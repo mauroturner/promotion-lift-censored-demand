@@ -448,6 +448,17 @@ def load_delivery(conn: sqlite3.Connection, days: pd.DataFrame, cube: tuple[np.n
     return LoadResult(spec.delivery_id, spec.as_of, loaded, len(profile), staged, checks)
 
 
+def set_recovered_sums(conn: sqlite3.Connection, date_keys: np.ndarray, sums: np.ndarray) -> int:
+    """Set ``series_days.recovered_sum`` (``sums`` is series x days, over the analysis hours) for the days `date_keys`, only where it is still NULL: what was
+    recovered is issued once and is never rewritten. In the caller's transaction; returns how many series-days it set."""
+    changed = 0
+    for column, key in enumerate(np.asarray(date_keys).tolist()):
+        cursor = conn.executemany("UPDATE series_days SET recovered_sum = ? WHERE series_key = ? AND date_key = ? AND recovered_sum IS NULL",
+                                  ((float(value), series, int(key)) for series, value in enumerate(np.asarray(sums)[:, column].tolist())))
+        changed += cursor.rowcount
+    return changed
+
+
 def rebuild_staging(conn: sqlite3.Connection, as_of: datetime, view: Any) -> list[CheckResult]:
     """Rebuild ``stg_series_days`` for the instant `as_of` from ``series_days`` and ``series``, which are not touched: whatever the warehouse holds
     since, a calculation for an instant gets what had closed at it (RNF06 a). One transaction with the controls of the load; a control with rows undoes it."""

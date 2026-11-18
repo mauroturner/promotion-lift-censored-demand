@@ -5,11 +5,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from promolift.cube import InterimError, day_inputs, open_loaded_cube, store_delivery_cube
+from promolift.cube import InterimError, day_inputs, open_loaded_cube
 from promolift.days import PROMO
 from promolift.masks import apply, first_stockout_pmf, mask_tail
 from promolift.recovery import Recovery, candidates, hidden_mass, recover_day
 from promolift.warehouse import connect
+from tests.fixtures.launching import rebuilt_interim
 
 LAUNCH = "L2024-06-25"
 ALL = "C2024-07-03"
@@ -76,14 +77,6 @@ def test_changing_a_hidden_hour_changes_no_estimate(launch_store, train_candidat
 def test_the_day_that_is_not_delivered_yet_cannot_be_read(launch_store, quick_cfg):
     with pytest.raises(KeyError, match="20240626"):
         read_day(launch_store, 20240626, quick_cfg)
-
-
-def rebuilt_interim(published, folder, modify=None):
-    """The cube of every delivery of the plan stored in `folder`, with `modify(date_keys, sales)` applied to each delivery's sales first."""
-    for spec in published.plan:
-        _entry, _days, (date_keys, sales, stock) = published.items[spec.delivery_id]
-        store_delivery_cube(folder, spec.delivery_id, date_keys, sales if modify is None else modify(spec.delivery_id, date_keys, sales.copy()), stock)
-    return folder
 
 
 def test_another_day_changes_no_recovery_of_this_day(published, full_store, train_candidates, quick_cfg, tmp_path):

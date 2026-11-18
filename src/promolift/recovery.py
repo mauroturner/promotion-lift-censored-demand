@@ -27,9 +27,10 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
 
+from promolift.bootstrap import interval, series_draws
 from promolift.cube import INPUT_COLUMNS, BlockInputs, DayInputs, build_inputs, group_index
 from promolift.days import ANOMALOUS, PROMO
-from promolift.masks import Mask, apply, mask_tail, truth
+from promolift.masks import Mask, apply, mask_random, mask_tail, truth
 
 METHODS = ("r0", "r1", "r2", "r3")
 TIE_TOLERANCE = 1e-6
@@ -219,3 +220,86 @@ def candidates(block: BlockInputs, days: np.ndarray, pmf: np.ndarray, view: Any)
     if "r3" in chosen:
         out.append(Recovery("r3", None, base, fit_r3(block, days, base, pmf, view), groups))
     return out
+
+
+# --- a block of days under a synthetic mask, and how the methods are scored on it (D07, D08; requirements, section 8.1) ------------------------------------------
+
+
+@dataclass(frozen=True)
+class MaskedBlock:
+    """The tail (or random) masks of a run of days, kept together: ``parts`` is one ``(inputs, mask)`` per day, and ``series_key``, ``date_key``, ``state`` and
+    ``truth`` (what the hidden hours sold) have one entry per masked series-day, in the order of the parts."""
+
+    parts: list[tuple[DayInputs, Mask]]
+    series_key: np.ndarray
+    date_key: np.ndarray
+    state: np.ndarray
+    truth: np.ndarray
+    hidden_hours: int
+
+
+def mask_block(block: BlockInputs, positions: np.ndarray, pmf: np.ndarray, seed: int, *, kind: str = "tail", hours: int = 3) -> MaskedBlock:
+    """Mask the days at `positions` of the block, one after the other with one generator seeded with `seed` (the same seed gives the same masks)."""
+    rng = np.random.default_rng(seed)
+    parts = []
+    for position in np.asarray(positions).tolist():
+        inputs = block.day(position)
+        parts.append((inputs, mask_tail(inputs, pmf, rng) if kind == "tail" else mask_random(inputs, hours, rng)))
+    return masked_block(parts)
+
+
+def masked_block(parts: list[tuple[DayInputs, Mask]]) -> MaskedBlock:
+    """A ``MaskedBlock`` of the given ``(inputs, mask)`` of each day."""
+    if not parts:
+        raise ValueError("no hay días que enmascarar")
+    return MaskedBlock(
+        parts, np.concatenate([i.series_key[m.rows] for i, m in parts]), np.concatenate([np.full(len(m.rows), i.date_key) for i, m in parts]),
+        np.concatenate([i.state[m.rows] for i, m in parts]), np.concatenate([truth(i, m).sum(axis=1) for i, m in parts]),
+        int(sum(m.hidden.sum() for _i, m in parts)))
+
+
+def masked_estimate(rec: Recovery, masked: MaskedBlock) -> np.ndarray:
+    """What the method gives back over the hidden hours of each masked series-day of the block."""
+    return np.concatenate([hidden_mass(rec, inputs, mask)[0] for inputs, mask in masked.parts])
+
+
+def _ratio(numerator: float, denominator: float) -> float | None:
+    return None if denominator <= 0 else float(numerator / denominator - 1.0)
+
+
+def score_candidates(estimates: Mapping[str, np.ndarray], masked: MaskedBlock, *, resamples: int, seed: int, reference: str = "r1") -> list[dict[str, Any]]:
+    """One row per candidate (in order) with what ``recovery_checks`` stores: the masked series-days and hours, the mass hidden, the WAPE of the mass per series, the
+    bias and the bias by day state (and the bias that induces in the lift, ``(1 + bias_promo) / (1 + bias_regular) - 1``) and the interval of series of the
+    candidate's WAPE minus the reference's."""
+    series_unique, inverse = np.unique(masked.series_key, return_inverse=True)
+    mass = np.bincount(inverse, weights=masked.truth)
+    errors = {name: np.abs(np.bincount(inverse, weights=guess - masked.truth)) for name, guess in estimates.items()}
+    promo, regular = masked.state == PROMO, masked.state != PROMO
+    draws = series_draws(np.column_stack([errors[name] for name in estimates]), mass, resamples, seed)
+    column = {name: k for k, name in enumerate(estimates)}
+    rows = []
+    for name, guess in estimates.items():
+        bias_promo = _ratio(guess[promo].sum(), masked.truth[promo].sum())
+        bias_regular = _ratio(guess[regular].sum(), masked.truth[regular].sum())
+        low, high = interval((draws[:, column[name]] - draws[:, column[reference]])[:, None]) if reference in column else (np.array([np.nan]), np.array([np.nan]))
+        rows.append({
+            "method": name, "series": int(len(series_unique)), "masked_days": int(len(masked.truth)), "hidden_hours": masked.hidden_hours, "hidden_mass": float(masked.truth.sum()),
+            "wape_series": float(errors[name].sum() / mass.sum()), "bias": float(guess.sum() / masked.truth.sum() - 1.0), "bias_promo": bias_promo, "bias_regular": bias_regular,
+            "lift_bias": None if bias_promo is None or bias_regular is None or bias_regular <= -1.0 else float((1.0 + bias_promo) / (1.0 + bias_regular) - 1.0),
+            "ci_low_vs_r1": float(low[0]), "ci_high_vs_r1": float(high[0])})
+    return rows
+
+
+def recover_block(rec: Recovery, block: BlockInputs, positions: np.ndarray) -> np.ndarray:
+    """``(series, len(positions), hours)`` float32: the days at `positions` recovered with the method (``recover_day`` of each one)."""
+    out = np.empty((block.sales.shape[0], len(positions), block.sales.shape[2]), dtype=np.float32)
+    for column, position in enumerate(np.asarray(positions).tolist()):
+        out[:, column, :] = recover_day(rec, block.day(position))
+    return out
+
+
+def refit(rec: Recovery, block: BlockInputs, days: np.ndarray, pmf: np.ndarray, view: Any) -> Recovery:
+    """The method `rec` fitted again on the `days` of the block, with the same kappa and the same R3 settings: the base (and R3, if it is R3) is what changes (D08)."""
+    base = fit_base(block, days)
+    r3 = fit_r3(block, days, base, pmf, view) if rec.method == "r3" else None
+    return replace(rec, base=base, r3=r3)

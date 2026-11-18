@@ -139,3 +139,31 @@ def test_the_same_day_in_two_deliveries_is_refused(tmp_path, published):
     keys, sales, stock = published.items["D2024-06-26"][2]
     with pytest.raises(InterimError, match=r"el día 20240626 ya está en la entrega D2024-06-26"):
         store_delivery_cube(tmp_path, "D2024-06-26-again", keys, sales, stock)
+
+
+# --- the recovered hours of a delivery ---------------------------------------------------------------------------------------------------
+
+
+def test_the_recovered_hours_of_a_delivery_are_stored_once_listed_in_their_own_manifest_and_read_back_only_if_they_are_the_listed_ones(tmp_path):
+    from promolift.cube import RECOVERED_MANIFEST, open_recovered, store_recovered
+
+    recovered = np.arange(2 * 3 * 24, dtype=np.float32).reshape(2, 3, 24) / 4
+    digest = store_recovered(tmp_path, "L1", np.array([20240601, 20240602, 20240603]), recovered)
+    folder = tmp_path / "cube"
+    assert sorted(p.name for p in folder.iterdir()) == sorted([RECOVERED_MANIFEST, "L1.recovered.npy"]) and digest == sha(folder / "L1.recovered.npy")
+    document = json.loads((folder / RECOVERED_MANIFEST).read_text(encoding="utf-8"))
+    assert document == {"version": 1, "deliveries": [{"delivery_id": "L1", "date_keys": [20240601, 20240602, 20240603], "name": "L1.recovered.npy", "sha256": digest}]}
+    again = store_recovered(tmp_path, "L1", np.array([20240601, 20240602, 20240603]), recovered)          # the same hours: nothing changes
+    assert again == digest and json.loads((folder / RECOVERED_MANIFEST).read_text(encoding="utf-8")) == document
+    read = open_recovered(tmp_path, "L1")
+    assert read.dtype == np.float32 and read.shape == (2, 3, 24) and not read.flags.writeable and np.array_equal(read, recovered)
+    with pytest.raises(InterimError, match="otro contenido"):
+        store_recovered(tmp_path, "L1", np.array([20240601, 20240602, 20240603]), recovered + 1)
+    with pytest.raises(InterimError, match="no hay horas recuperadas"):
+        open_recovered(tmp_path, "L2")
+    del read
+    (folder / "L1.recovered.npy").write_bytes((folder / "L1.recovered.npy").read_bytes()[:-4] + b"\0\0\0\1")
+    with pytest.raises(InterimError, match="no es el archivo"):
+        open_recovered(tmp_path, "L1")
+    store_recovered(tmp_path, "L1", np.array([20240601, 20240602, 20240603]), recovered)                   # a damaged file is written again
+    assert np.array_equal(open_recovered(tmp_path, "L1"), recovered)

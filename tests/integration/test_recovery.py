@@ -3,15 +3,21 @@ touch and hours it may not. The tripwire M01 joins this file in U09."""
 
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from promolift.cube import load_block, open_loaded_cube
+from promolift.launch import LeakTripwireError
+from promolift.leakage_demo import leaky_hidden_mass
 from promolift.masks import first_stockout_pmf, mask_tail
 from promolift.recovery import candidate_name, candidates, estimate, hidden_mass, recover_day
 from promolift.split import block_of
 from promolift.warehouse import connect
+from tests.fixtures.launching import launch
 
 LAUNCH = "L2024-06-25"
 
@@ -73,3 +79,35 @@ def test_r3_fits_the_same_model_twice(train, quick_cfg):
     again = candidates(block, in_train, pmf, quick_cfg)[-1]
     day = block.day(60)
     assert np.array_equal(estimate(recoveries[-1], day), estimate(again, day))
+
+
+def sha(path: Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest() if Path(path).exists() else ""
+
+
+def test_a_recovery_that_reads_sale_amount_trips_m01_and_stops_the_launch(fresh, fixture_truth, tmp_path):
+    cfg, conn = fresh()
+    before = sha(tmp_path / "w.sqlite")
+    seen = {}
+
+    def reads_the_daily_total(inputs, mask, cube):
+        seen["called"] = seen.get("called", 0) + 1
+        return leaky_hidden_mass(cube, inputs, mask)
+
+    with pytest.raises(LeakTripwireError, match="fuga") as caught:
+        launch(cfg, conn, fixture_truth, extra_candidates={"reads_sale_amount": reads_the_daily_total})
+    assert seen["called"] > 0 and "reads_sale_amount" in str(caught.value) and "M01" in str(caught.value)
+    conn.close()
+    assert sha(tmp_path / "w.sqlite") == before                     # the warehouse is byte for byte as it was
+    assert not (tmp_path / "models").exists() and not cfg.paths.seal.exists()
+
+
+def test_the_methods_are_fitted_on_the_days_they_are_given_and_on_no_other(train, quick_cfg):
+    block, in_train, pmf, recoveries = train
+    scrambled = type(block)(block.series_key, block.date_keys, block.hours, np.where(in_train[None, :, None], block.sales, block.sales[:, ::-1, :] * 3.0 + 1.0),
+                            np.where(in_train[None, :, None], block.stock, 1 - block.stock), block.state, block.band, block.group)
+    again = candidates(scrambled, in_train, pmf, quick_cfg)
+    assert np.array_equal(recoveries[0].base, again[0].base)          # what V1, V2 and the purge hold cannot reach what is fitted on the training block
+    day = block.day(60)
+    for first, second in zip(recoveries, again, strict=True):
+        assert np.array_equal(estimate(first, day), estimate(second, day)), first.method

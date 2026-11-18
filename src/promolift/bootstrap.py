@@ -28,18 +28,29 @@ def weighted_sums(rec: Records, unit_of: np.ndarray, n_units: int, series_weight
     return numerator, denominator
 
 
-def two_way_draws(rec: Records, unit_of: np.ndarray, n_units: int, resamples: int, seed: int, *, days: bool = True) -> np.ndarray:
-    """``(resamples, n_units)`` lifts of the weighted records, resampling the series of the view and, unless `days` is false, its days too. A unit whose
-    weighted counterfactual is 0 gives NaN."""
+def two_way_draws_many(rec: Records, units: list[tuple[np.ndarray, int]], resamples: int, seed: int, *, days: bool = True) -> list[np.ndarray]:
+    """``two_way_draws`` for several families of units at once (each ``(unit_of, n_units)``) over the same weights: the draws of every family are the ones a
+    separate call with the same seed gives, for the price of computing the weights of the records once."""
     rng = np.random.default_rng(seed)
-    out = np.full((resamples, n_units), np.nan)
+    out = [np.full((resamples, n_units), np.nan) for _unit_of, n_units in units]
     ones = np.ones(rec.n_days)
+    keep = [np.asarray(unit_of) >= 0 for unit_of, _n in units]
     for draw in range(resamples):
         series_weights = np.bincount(rng.integers(0, rec.n_series, rec.n_series), minlength=rec.n_series)
         day_weights = np.bincount(rng.integers(0, rec.n_days, rec.n_days), minlength=rec.n_days) if days else ones
-        numerator, denominator = weighted_sums(rec, unit_of, n_units, series_weights, day_weights)
-        out[draw] = np.divide(numerator, denominator, out=np.full(n_units, np.nan), where=denominator > 0) - 1.0
+        weight = series_weights[rec.series] * day_weights[rec.day].astype(np.float64)
+        for family, (unit_of, n_units) in enumerate(units):
+            mask, unit = keep[family], np.asarray(unit_of)
+            numerator = np.bincount(unit[mask], weights=(weight * rec.observed)[mask], minlength=n_units)
+            denominator = np.bincount(unit[mask], weights=(weight * rec.counterfactual)[mask], minlength=n_units)
+            out[family][draw] = np.divide(numerator, denominator, out=np.full(n_units, np.nan), where=denominator > 0) - 1.0
     return out
+
+
+def two_way_draws(rec: Records, unit_of: np.ndarray, n_units: int, resamples: int, seed: int, *, days: bool = True) -> np.ndarray:
+    """``(resamples, n_units)`` lifts of the weighted records, resampling the series of the view and, unless `days` is false, its days too. A unit whose
+    weighted counterfactual is 0 gives NaN."""
+    return two_way_draws_many(rec, [(unit_of, n_units)], resamples, seed, days=days)[0]
 
 
 def interval(draws: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

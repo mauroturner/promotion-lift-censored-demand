@@ -45,3 +45,11 @@ def rank_cells(lift: np.ndarray, low: np.ndarray, high: np.ndarray, series: np.n
         open_group.append(int(cell))
         rank[cell], tier[cell] = place, current
     return pd.DataFrame({"lift": lift, "ci_low": low, "ci_high": high, "series": series.astype(np.int64), "ranked": ranked, "rank": rank, "tier": tier})
+
+
+def spearman(x: np.ndarray, y: np.ndarray) -> float:
+    """The rank correlation of two samples (ties take the mean rank), NaN if there are fewer than two points or one of them has no spread."""
+    x, y = np.asarray(x, dtype=np.float64), np.asarray(y, dtype=np.float64)
+    if len(x) < 2:
+        return float("nan")
+    return float(pd.Series(x).rank().corr(pd.Series(y).rank()))

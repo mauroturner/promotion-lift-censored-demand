@@ -8,6 +8,7 @@ import re
 import sqlite3
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from promolift import warehouse
@@ -15,6 +16,9 @@ from promolift.warehouse import SchemaDriftError, apply_schema, connect, run_che
 
 PROJECT = Path(__file__).resolve().parents[2]
 CORE_TABLES = ["deliveries", "hour_profile", "pipeline_runs", "series", "series_days", "validation_results"]
+# 002_effects.sql (U09, U10): what the model said, issued once
+EFFECT_TABLES = ["daily_cell", "effect_estimates", "forecasts", "mask_checks", "model_registry", "recovery_checks"]
+SCHEMA_TABLES = sorted([*CORE_TABLES, *EFFECT_TABLES])
 
 
 def tables(conn) -> list[str]:
@@ -98,11 +102,11 @@ def test_apply_schema_creates_the_core_tables_and_is_idempotent(tmp_path):
     conn = connect(tmp_path / "w.sqlite")
     try:
         apply_schema(conn)
-        assert tables(conn) == CORE_TABLES
+        assert tables(conn) == SCHEMA_TABLES
         conn.execute("INSERT INTO series VALUES (1, 3, 1, 500, 0, 40, 20, 100)")
         apply_schema(conn)
         apply_schema(conn)
-        assert tables(conn) == CORE_TABLES and conn.execute("SELECT COUNT(*) FROM series").fetchone()[0] == 1, "the data is kept"
+        assert tables(conn) == SCHEMA_TABLES and conn.execute("SELECT COUNT(*) FROM series").fetchone()[0] == 1, "the data is kept"
         assert not conn.in_transaction
     finally:
         conn.close()
@@ -214,3 +218,22 @@ def test_a_control_counts_every_violation_and_samples_five(conn, cfg):
                      [day(date_key=20240328 + i, instock_hours=10, stockout_hours=5, fully_out=0) for i in range(8)])
     (result,) = run_checks(conn, "load", sql_params(datetime(2024, 6, 26), cfg), only=["chk_hours_add_up"])
     assert result.violations == 8 and len(result.sample) == warehouse.SAMPLE_LIMIT == 5
+
+
+def test_the_recovered_sums_are_set_once_and_never_rewritten(tmp_path):
+    from promolift.warehouse import set_recovered_sums
+
+    conn = connect(tmp_path / "w.sqlite")
+    try:
+        apply_schema(conn)
+        conn.execute("INSERT INTO series VALUES (0, 3, 1, 500, 0, 40, 20, 100)")
+        conn.execute("INSERT INTO series VALUES (1, 4, 1, 501, 0, 40, 20, 101)")
+        conn.execute("INSERT INTO deliveries VALUES ('L', 'launch', '2024-06-01', '2024-06-02', '2024-06-03 00:00:00', 4, ?, 'loaded', 'r')", ("a" * 64,))
+        conn.executemany("INSERT INTO series_days VALUES (?, ?, 'L', 'regular', NULL, 0, 1.0, 0, 1.0, 16, 0, 1.0, NULL, 0)", [(s, d) for s in (0, 1) for d in (20240601, 20240602)])
+        assert set_recovered_sums(conn, np.array([20240601, 20240602]), np.array([[1.5, 2.5], [3.5, 4.5]])) == 4
+        rows = conn.execute("SELECT series_key, date_key, recovered_sum FROM series_days ORDER BY series_key, date_key").fetchall()
+        assert rows == [(0, 20240601, 1.5), (0, 20240602, 2.5), (1, 20240601, 3.5), (1, 20240602, 4.5)]
+        assert set_recovered_sums(conn, np.array([20240601, 20240602]), np.array([[9.0, 9.0], [9.0, 9.0]])) == 0
+        assert conn.execute("SELECT series_key, date_key, recovered_sum FROM series_days ORDER BY series_key, date_key").fetchall() == rows
+    finally:
+        conn.close()

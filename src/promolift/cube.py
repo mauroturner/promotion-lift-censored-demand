@@ -37,6 +37,7 @@ CANONICAL_DIR = "canonical"
 LOADED_CUBE_DIR = "cube"
 CUBE_MANIFEST = "manifest.json"
 CUBE_MANIFEST_VERSION = 1
+RECOVERED_MANIFEST = "recovered.json"
 TABLES = ("series.parquet", "series_days.parquet")
 FIELDS = ("sales", "stock")
 DTYPES = {"sales": np.dtype(np.float32), "stock": np.dtype(np.int8)}
@@ -407,3 +408,56 @@ def build_inputs(frame: Any) -> Any:
     if missing:
         raise LeakageError(f"M02: a la entrada le falta la columna {missing[0]!r} de las permitidas")
     return frame[list(INPUT_COLUMNS)]
+
+
+# --- the recovered hours of a delivery (RF09, D22): one file per delivery next to its hours, with a manifest of its own -------------------------------------------
+
+
+def _read_recovered_manifest(folder: Path) -> list[dict[str, Any]]:
+    path = Path(folder) / RECOVERED_MANIFEST
+    if not path.is_file():
+        return []
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        entries = document["deliveries"]
+        valid = (isinstance(document, dict) and set(document) == {"version", "deliveries"} and document["version"] == CUBE_MANIFEST_VERSION and isinstance(entries, list)
+                 and all(isinstance(e, dict) and set(e) == {"delivery_id", "date_keys", "name", "sha256"} and isinstance(e["delivery_id"], str) and isinstance(e["name"], str)
+                         and isinstance(e["date_keys"], list) and all(isinstance(k, int) for k in e["date_keys"]) and _HEX64.fullmatch(str(e["sha256"])) for e in entries))
+    except (OSError, ValueError, KeyError, TypeError):
+        valid = False
+    if not valid:
+        raise InterimError(f"{RECOVERED_MANIFEST} no es un manifiesto válido de las horas recuperadas (runbook R12)")
+    return entries
+
+
+def store_recovered(interim_dir: Path, delivery_id: str, date_keys: np.ndarray, recovered: np.ndarray) -> str:
+    """Write ``<interim_dir>/cube/<delivery_id>.recovered.npy`` (float32, series x days x 24: the hours of the analysis recovered, the others as they were) and
+    list it in ``recovered.json``, written last and atomically; returns its SHA-256. The same hours again change nothing (a file that was lost or damaged is written
+    again); other hours for a delivery already listed are refused: what was recovered is issued once."""
+    folder = Path(interim_dir) / LOADED_CUBE_DIR
+    keys = [int(k) for k in np.asarray(date_keys).tolist()]
+    data = _npy_bytes(recovered, np.dtype(np.float32))
+    digest = hashlib.sha256(data).hexdigest()
+    entries = _read_recovered_manifest(folder)
+    existing = next((e for e in entries if e["delivery_id"] == delivery_id), None)
+    if existing is not None and (existing["sha256"] != digest or existing["date_keys"] != keys):
+        raise InterimError(f"las horas recuperadas de la entrega {delivery_id} ya están guardadas con otro contenido (runbook R12): lo recuperado se emite una vez")
+    path = folder / f"{delivery_id}.recovered.npy"
+    if not path.is_file() or sha256_file(path) != digest:
+        write_atomic(path, data)
+    if existing is None:
+        entry = {"delivery_id": delivery_id, "date_keys": keys, "name": path.name, "sha256": digest}
+        write_atomic(folder / RECOVERED_MANIFEST, json.dumps({"version": CUBE_MANIFEST_VERSION, "deliveries": [*entries, entry]}, indent=2) + "\n")
+    return digest
+
+
+def open_recovered(interim_dir: Path, delivery_id: str) -> np.ndarray:
+    """The recovered hours of a delivery, ``(series, days, 24)`` read-only, only if the file is the one the manifest names (``InterimError`` otherwise)."""
+    folder = Path(interim_dir) / LOADED_CUBE_DIR
+    entry = next((e for e in _read_recovered_manifest(folder) if e["delivery_id"] == delivery_id), None)
+    if entry is None:
+        raise InterimError(f"no hay horas recuperadas de la entrega {delivery_id} en {RECOVERED_MANIFEST} (runbook R12)")
+    path = folder / entry["name"]
+    if not path.is_file() or sha256_file(path) != entry["sha256"]:
+        raise InterimError(f"{entry['name']} no es el archivo que dice el manifiesto de las horas recuperadas (runbook R12)")
+    return np.load(path, mmap_mode="r", allow_pickle=False)
