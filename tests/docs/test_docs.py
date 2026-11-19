@@ -547,7 +547,7 @@ def test_the_root_rows_of_project_06_carry_the_real_figures(project_root: Path) 
     for figure in ("46,5", "47,9", "52,0", "52,9", "0,897", "58,3", "40,3", "35,0", "43,9", "−1,81", "+4,36", "103.629", "183", "903", "876", "62", "68", "4.077,9", "5.808,7"):
         assert figure in rows, figure
     assert rows.count("no supera") >= 1 and rows.count("no cumple") >= 2 and all(f"C{n:02d}" in rows for n in range(1, 10)) and "PeakWorkingSetSize" in rows
-    assert "RNF02" in rows and "No aplicado" in rows and "todavía no se hizo" in rows and "@gmail" not in rows   # the page is not built, and the daily time is open
+    assert "RNF02" in rows and "Aplicado en el sitio el 2026-11-18" in rows and "No aplicado" not in rows and "@gmail" not in rows   # the page is applied (marca-personal L131)
     assert not re.search(r"[A-Za-z]:[\\/]+(Users|Documents and Settings)", rows) and "Users" not in rows
 
 
