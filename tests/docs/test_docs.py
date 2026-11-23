@@ -1,7 +1,7 @@
 """The documentation is checked like code (AC22, AC37; RF24; RNF14; plan, sections 24.2, 25 and 26).
 
-U20: the README has the headings of plan section 25 in their order, its results block is the sealed summary that ``docs-sync`` copies (never one written by hand), and it
-says the unfavourable verdicts («no supera», «no se cumple») in «El problema», «La solución» and «Los resultados»; the model card has the contents the plan lists, every
+U20: the README has the headings of the portfolio's numbered outline (ESTRUCTURA-PROYECTOS.md, which replaced plan section 25's), its results block is the sealed
+summary that ``docs-sync`` copies (never one written by hand) in an appendix, and it says the unfavourable verdicts («no supera», «no se cumple») in 1.1, 1.2 and 5.1; the model card has the contents the plan lists, every
 verdict as the summary writes it, the memory counters and the suite's limit; every interval bound that the documents quote is the summary's, rounded to the decimals the
 document writes. These tests read the versioned Markdown and the versioned reports and run nothing.
 
@@ -29,9 +29,21 @@ from promolift.reporting import RESULTS_END, RESULTS_START
 README_TITLE = "# Qué promociones venden de verdad"
 USER_NAMES = {name.lower() for name in (getpass.getuser(), Path.home().name) if name}   # this machine's user, read here and never written in a test (A8)
 EMAIL = re.compile(r"\S+@\S+")                                                         # a public contact address may carry a name: it is not a local path
-README_HEADINGS = [   # plan, section 25, in this order (AC37)
-    "El problema", "La solución", "Los resultados", "En qué consiste", "Los datos", "Los algoritmos", "El producto", "La documentación",
-    "Con IA, de punta a punta", "Para qué sirve", "Cómo correrlo de punta a punta", "Paso a paso", "Fuente y licencia",
+README_HEADINGS = [   # the portfolio's numbered outline (ESTRUCTURA-PROYECTOS.md), then the appendices, in this order (AC37)
+    "1. Resumen ejecutivo", "2. Datasets y preparación", "3. Arquitectura y metodología", "4. Producto final", "5. Conclusión",
+    "Resultados completos de la corrida", "Cómo correrlo de punta a punta", "Paso a paso", "Fuente y licencia",
+]
+README_SUBSECTIONS = [
+    "1.1 Problema de negocio y solución", "1.2 Criterios de éxito e impacto",
+    "2.1 Fuentes, alcance y granularidad", "2.2 Saneamiento y reglas de calidad",
+    "3.1 Fuente e ingesta", "3.2 Orquestación y transformación", "3.3 Almacenamiento y modelado de datos",
+    "3.4 Experimentación y Machine Learning", "3.5 Consumo y gobernanza",
+    "4.1 Entregables operativos", "4.2 Lectura de resultados actuales",
+    "5.1 Evaluación frente a criterios de éxito", "5.2 Limitaciones metodológicas", "5.3 Trabajo futuro",
+]
+README_ML_SUBSECTIONS = [   # 3.4.3 names the method the project used, as the outline asks
+    "3.4.1 Ingeniería de características y línea base (baseline)", "3.4.2 Decisiones de modelado y ablación (ADR)",
+    "3.4.3 Protocolo de validación (partición en el tiempo y prueba sellada)",
 ]
 MODEL_CARD_HEADINGS = [   # what plan section 25 lists for the model card, in this order
     "Uso previsto y no previsto", "Datos", "Estados del día y control", "Recuperación y su validación sintética", "Contrafactual", "Intervalos", "Ranking",
@@ -68,19 +80,28 @@ def section(text: str, title: str, end: str | None = None) -> str:
     return re.split(r"^## ", body, flags=re.MULTILINE)[0]
 
 
+def subsection(text: str, title: str) -> str:
+    """The body of the third-level section `title`, up to the next heading of its level or above."""
+    body = text.split(f"\n### {title}\n", 1)[1]
+    return re.split(r"^#{2,3} ", body, flags=re.MULTILINE)[0]
+
+
 def test_readme_headings_in_order_and_results_block_matches_summary(project_root: Path, readme: str, summary: dict) -> None:
     assert readme.startswith(README_TITLE + "\n")
     assert readme.count(RESULTS_START) == 1 and readme.count(RESULTS_END) == 1
     head, rest = readme.split(RESULTS_START)
     block, tail = rest.split(RESULTS_END)
     block = block.strip("\n")
-    # the block carries its own «## Resultados»: the headings of the plan are those outside it, in order
+    # the block carries its own «## Resultados»: the headings of the outline are those outside it, in order, and no section tells how AI built the project (S104 f)
     assert re.findall(r"^## (.+)$", head + tail, flags=re.MULTILINE) == README_HEADINGS
+    assert re.findall(r"^### (\d.+)$", head, flags=re.MULTILINE) == README_SUBSECTIONS
+    assert re.findall(r"^#### (\d.+)$", head, flags=re.MULTILINE) == README_ML_SUBSECTIONS
+    assert "Con IA" not in readme and not re.search(r"\b(?:agentes? de IA|Opus|Sonnet|Haiku)\b", readme)
     written = (project_root / "reports" / "evaluation_summary.md").read_text(encoding="utf-8")
     assert block == written.strip("\n")   # what docs-sync copies, byte for byte
     assert block.startswith(RESULTS_HEADING + "\n") and re.findall(r"^## (.+)$", block, flags=re.MULTILINE) == ["Resultados"]
-    framing = section(readme, "Los resultados", end=RESULTS_START)   # «Los resultados» frames the block before it and reads it after it
-    assert len(framing.strip()) > 400 and "\n## En qué consiste\n" in tail
+    framing = section(readme, "Resultados completos de la corrida", end=RESULTS_START)   # the appendix frames the block, and 5.1 reads it
+    assert len(framing.strip()) > 400 and "\n## Cómo correrlo de punta a punta\n" in tail
     # AC22: the sealed summary is unfavourable, and the README says «no supera» outside the block too, in the three sections that tell it
     assert summary["evaluation_status"] == "sealed" and summary["post_seal"] is None
     assert [c["criterion_id"] for c in summary["criteria"] if c["passed"] is False] == FAILED
@@ -88,9 +109,9 @@ def test_readme_headings_in_order_and_results_block_matches_summary(project_root
     assert [c["criterion_id"] for c in summary["criteria"] if c["passed"] is None] == ["C10"]
     for criterion in summary["criteria"]:
         assert criterion["verdict_es"] in block, criterion["criterion_id"]
-    reading = framing + tail.split("\n## En qué consiste\n")[0]
-    for title, text in (("El problema", section(readme, "El problema")), ("La solución", section(readme, "La solución")), ("Los resultados", reading)):
-        assert "no supera" in text, title
+    reading = subsection(head, "5.1 Evaluación frente a criterios de éxito")
+    for title in ("1.1 Problema de negocio y solución", "1.2 Criterios de éxito e impacto", "5.1 Evaluación frente a criterios de éxito"):
+        assert "no supera" in subsection(head, title), title
     for criterion in FAILED + PASSED:
         assert re.search(rf"\b{criterion}\b", reading), criterion
     assert "se esperaba" in reading and "F1" in reading and "RNF02" in reading   # the expectation said before measuring, the naive rule and the open requirement
