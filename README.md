@@ -358,3 +358,5 @@ Every operation, with its failures and how to recover, is in the [runbook](docs/
 Data source: Dingdong-Inc, FreshRetailNet-50K, Hugging Face, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), commit `c374e859`; Wang et al. (2026), arXiv:2505.16319. Copy used: the two Parquet files of the pinned commit, `train.parquet` (106,436,287 bytes, SHA-256 `6706832db892bbae4969c19d87e07975d2543d2ba7d7d4756360654785de5a3d`) and `eval.parquet` (8,440,124 bytes, SHA-256 `1b118840664280c6b88bffc84c80ee1f54c05d911e354b7599e5da10995e960e`).
 
 The raw data is not versioned, and the flow requires each file to have the pinned size and hash. The dataset carries no personal data: stores and products are numeric identifiers.
+
+The code is under the [MIT licence](LICENSE); the source data keeps the licence given above.

@@ -375,3 +375,5 @@ Lo que consta en el registro del documento de seguimiento (L70 a L88) y en `git 
 Fuente de datos: Dingdong-Inc, FreshRetailNet-50K, Hugging Face, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), commit `c374e859`; Wang et al. (2026), arXiv:2505.16319. Copia usada: los dos Parquet del commit fijado, `train.parquet` (106.436.287 bytes, SHA-256 `6706832db892bbae4969c19d87e07975d2543d2ba7d7d4756360654785de5a3d`) y `eval.parquet` (8.440.124 bytes, SHA-256 `1b118840664280c6b88bffc84c80ee1f54c05d911e354b7599e5da10995e960e`).
 
 Los datos crudos no se versionan: el flujo no descarga nada y exige que cada archivo tenga el tamaño y la huella fijados. El conjunto no trae datos personales: las tiendas y los productos son identificadores numéricos. La cifra de 1,43 veces de mediana por serie que da el artículo usa otra definición que este proyecto (cociente de sumas) y no se compara con la propia (D37); la medida con la definición del artículo sobre el entrenamiento fue de 1,38.
+
+El código está bajo la [licencia MIT](LICENSE); los datos de origen conservan la licencia indicada arriba.
