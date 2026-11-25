@@ -1,4 +1,4 @@
-# Which promotions really sell
+# Censored demand and an IPF counterfactual to rank promotions by sales lift
 
 **English** · [Español](README.es.md)
 

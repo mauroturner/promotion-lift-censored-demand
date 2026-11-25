@@ -1,4 +1,4 @@
-# Qué promociones venden de verdad
+# Demanda censurada y contrafactual IPF para ordenar promociones por su aumento de ventas
 
 [English](README.md) · **Español**
 

@@ -26,7 +26,7 @@ import pytest
 
 from promolift.reporting import RESULTS_END, RESULTS_START
 
-README_TITLE = "# Qué promociones venden de verdad"
+README_TITLE = "# Demanda censurada y contrafactual IPF para ordenar promociones por su aumento de ventas"
 USER_NAMES = {name.lower() for name in (getpass.getuser(), Path.home().name) if name}   # this machine's user, read here and never written in a test (A8)
 EMAIL = re.compile(r"\S+@\S+")                                                         # a public contact address may carry a name: it is not a local path
 README_HEADINGS = [   # the portfolio's numbered outline (ESTRUCTURA-PROYECTOS.md), then the appendices, in this order (AC37)
