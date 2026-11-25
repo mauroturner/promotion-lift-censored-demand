@@ -55,9 +55,17 @@ RESULTS_HEADING = "## Resultados"   # the first line of the summary, copied as i
 DAILY_TIME_TEST = "tests/e2e/test_real.py::test_every_daily_run_takes_at_most_the_required_seconds"
 
 
+def root_document(project_root: Path, name: str) -> str:
+    """A document at the portfolio's root. The project is also published on its own repository, where the test that reads it is skipped."""
+    path = project_root.parent / name
+    if not path.is_file():
+        pytest.skip(f"{name} is at the root of the portfolio, which is not here")
+    return path.read_text(encoding="utf-8")
+
+
 @pytest.fixture(scope="module")
 def readme(project_root: Path) -> str:
-    return (project_root / "README.md").read_text(encoding="utf-8")
+    return (project_root / "README.es.md").read_text(encoding="utf-8")
 
 
 @pytest.fixture(scope="module")
@@ -87,6 +95,7 @@ def subsection(text: str, title: str) -> str:
 
 
 def test_readme_headings_in_order_and_results_block_matches_summary(project_root: Path, readme: str, summary: dict) -> None:
+    check_the_english_readme(project_root, readme)
     assert readme.startswith(README_TITLE + "\n")
     assert readme.count(RESULTS_START) == 1 and readme.count(RESULTS_END) == 1
     head, rest = readme.split(RESULTS_START)
@@ -168,7 +177,7 @@ def decision(project_root: Path, number: int) -> str:
 
 def root_rows(project_root: Path, *, required: bool = True) -> str:
     """The section of project 06 in the root ``SITE-UPDATES.md``, up to the next project or the end (empty when it is not required and there is none)."""
-    text = (project_root.parent / "SITE-UPDATES.md").read_text(encoding="utf-8")
+    text = root_document(project_root, "SITE-UPDATES.md")
     if not required and "\n## 06 " not in text:
         return ""
     assert text.count("\n## 06 ") == 1, "SITE-UPDATES.md has no section for project 06"
@@ -388,7 +397,7 @@ def _sync_project(project_root: Path, tmp_path: Path, dictionary: str | None) ->
     shutil.copyfile(project_root / "config" / "pipeline.toml", tmp_path / "config" / "pipeline.toml")
     (tmp_path / "reports").mkdir()
     (tmp_path / "reports" / "evaluation_summary.md").write_text("## Resultados\n\n| C01 | no supera |\n", encoding="utf-8", newline="\n")
-    (tmp_path / "README.md").write_text(f"# P\n\n{RESULTS_START}\nviejo\n{RESULTS_END}\n", encoding="utf-8", newline="\n")
+    (tmp_path / "README.es.md").write_text(f"# P\n\n{RESULTS_START}\nviejo\n{RESULTS_END}\n", encoding="utf-8", newline="\n")
     if dictionary is not None:   # next to the figures folder of the configuration (docs/figures), as docs/ is in the project
         (tmp_path / "docs").mkdir()
         (tmp_path / "docs" / "data-dictionary.md").write_text(dictionary, encoding="utf-8", newline="\n")
@@ -402,12 +411,12 @@ def test_docs_sync_writes_the_dictionary_tables_and_a_second_run_changes_nothing
 
     config = _sync_project(project_root, tmp_path, f"# D\n\n{COLUMNS_START}\nviejo\n{COLUMNS_END}\n\nal final\n")
     assert cli.main(["docs-sync", "--config", config]) == 0
-    assert capsys.readouterr().out.splitlines() == ["README.md actualizado", "data-dictionary.md actualizado"]
+    assert capsys.readouterr().out.splitlines() == ["README.es.md actualizado", "data-dictionary.md actualizado"]
     text = (tmp_path / "docs" / "data-dictionary.md").read_text(encoding="utf-8")
     assert text == f"# D\n\n{COLUMNS_START}\n{render_dictionary_tables(MODEL).strip()}\n{COLUMNS_END}\n\nal final\n" and "viejo" not in text
-    assert "| C01 | no supera |" in (tmp_path / "README.md").read_text(encoding="utf-8")
+    assert "| C01 | no supera |" in (tmp_path / "README.es.md").read_text(encoding="utf-8")
     assert cli.main(["docs-sync", "--config", config]) == 0
-    assert capsys.readouterr().out.splitlines() == ["README.md ya estaba al día", "data-dictionary.md ya estaba al día"]
+    assert capsys.readouterr().out.splitlines() == ["README.es.md ya estaba al día", "data-dictionary.md ya estaba al día"]
 
 
 def test_docs_sync_without_a_dictionary_still_syncs_only_the_readme(project_root: Path, tmp_path: Path, capsys) -> None:
@@ -416,7 +425,7 @@ def test_docs_sync_without_a_dictionary_still_syncs_only_the_readme(project_root
 
     config = _sync_project(project_root, tmp_path, None)
     assert cli.main(["docs-sync", "--config", config]) == 0
-    assert capsys.readouterr().out.splitlines() == ["README.md actualizado"]
+    assert capsys.readouterr().out.splitlines() == ["README.es.md actualizado"]
     assert not (tmp_path / "docs").exists()
 
 
@@ -491,7 +500,7 @@ def test_the_step_by_step_names_every_unit_and_cites_commits_that_exist(project_
 def test_relative_links_and_images_point_to_files_that_exist(project_root: Path, readme: str) -> None:
     """Every relative link and image of the README and of the documents resolves, and the README links to every document of ``docs/`` that exists."""
     broken = []
-    for document in [project_root / "README.md", *sorted((project_root / "docs").glob("*.md"))]:
+    for document in [project_root / "README.md", project_root / "README.es.md", *sorted((project_root / "docs").glob("*.md"))]:
         text = document.read_text(encoding="utf-8")
         for target in [*LINK.findall(text), *IMAGE.findall(text)]:
             if not re.match(r"^(https?:|mailto:)", target) and not (document.parent / target).resolve().exists():
@@ -574,7 +583,7 @@ def test_the_root_rows_of_project_06_carry_the_real_figures(project_root: Path) 
 
 def test_the_landing_expansion_names_project_06_in_the_rows_it_uses_and_adds_no_library(project_root: Path) -> None:
     """D32: project 06 is added to the rows of pyarrow, NumPy, SQLite, matplotlib, pytest and PostgreSQL; it adds none (statsmodels is not used)."""
-    text = (project_root.parent / "LANDING-EXPANSION.md").read_text(encoding="utf-8")
+    text = root_document(project_root, "LANDING-EXPANSION.md")
     rows = {line.split("|")[1].strip(): line for line in text.splitlines() if re.match(r"^\| [^|]+ \|", line)}
     for technology in ("NumPy", "SQLite", "Apache Parquet con pyarrow", "matplotlib", "pytest", "PostgreSQL"):
         assert "06 Qué promociones" in rows[technology], technology
@@ -641,3 +650,12 @@ def test_every_markdown_table_has_as_many_cells_in_its_delimiter_and_its_rows_as
             body = rows[: next((k for k, row in enumerate(rows) if not row.startswith("|")), len(rows))]   # the delimiter and the rows under it, up to the first line that is not a table row
             broken += [f"{name}:{at + 1 + k}" for k, row in enumerate(body) if _cells(row) != width]
     assert broken == [] and tables >= 40
+
+
+def check_the_english_readme(project_root: Path, readme: str) -> None:
+    """README.md is the page of the project in English; README.es.md is the full one, which ``docs-sync`` and the other tests check."""
+    english = (project_root / "README.md").read_text(encoding="utf-8")
+    assert "**English** · [Español](README.es.md)" in english and "[English](README.md) · **Español**" in readme
+    assert english.count("6 of 9 success criteria met") == 2 and "undefined" not in english and "@gmail" not in english
+    for target in ("docs/screenshots/dashboard.png", "docs/screenshots/demo.png", "docs/model-card.md", "docs/evaluation.md"):
+        assert f"]({target})" in english and (project_root / target).is_file(), target
